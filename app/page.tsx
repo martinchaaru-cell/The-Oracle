@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function HomePage() {
+export default function Home() {
   return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
       <h1>🎯 Match Oracle</h1>
       <p>Welcome to the Match Oracle platform</p>
       <p>Your AI-powered football prediction system</p>
