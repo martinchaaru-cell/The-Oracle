@@ -1,3 +1,11 @@
+import React from 'react';
+import './globals.css';
+
+export const metadata = {
+  title: 'Match Oracle',
+  description: 'AI-powered football prediction platform',
+};
+
 export default function RootLayout({
   children,
 }: {
