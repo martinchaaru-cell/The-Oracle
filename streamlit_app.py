@@ -6,7 +6,7 @@ import time
 import requests
 import sys
 import os
-import json
+import pytz
 
 # ========== PAGE CONFIGURATION ==========
 st.set_page_config(
@@ -15,6 +15,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ========== TIMEZONE CONFIGURATION ==========
+NAIROBI_TZ = pytz.timezone('Africa/Nairobi')  # GMT+3
+
+def get_current_time():
+    """Get current time in GMT+3 (Nairobi timezone)"""
+    return datetime.now(NAIROBI_TZ)
+
+def format_time(dt):
+    """Format datetime to readable string"""
+    return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 # ========== ENVIRONMENT VARIABLES & SECRETS ==========
 try:
@@ -71,67 +82,41 @@ st.markdown("""
         font-size: 0.7rem;
         animation: pulse 1s infinite;
     }
+    .demo-badge {
+        background-color: #f59e0b;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+    }
+    .status-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #1e293b;
+        padding: 0.5rem 1rem;
+        font-size: 0.7rem;
+        color: #94a3b8;
+        border-top: 1px solid #334155;
+        z-index: 999;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
     @keyframes pulse {
         0% { opacity: 1; }
         50% { opacity: 0.5; }
         100% { opacity: 1; }
     }
+    /* Add padding to bottom of main content to prevent overlap with status bar */
+    .main-content {
+        padding-bottom: 50px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== SAFE DATA EXTRACTION FUNCTIONS ==========
-def safe_get(data, *keys, default="?"):
-    """Safely extract nested dictionary values"""
-    for key in keys:
-        if isinstance(data, dict):
-            data = data.get(key, default)
-        else:
-            return default
-    return data if data is not None else default
-
-def extract_fixture_info(fixture):
-    """Extract readable info from fixture regardless of format"""
-    try:
-        # Handle M1 LegData objects
-        if hasattr(fixture, 'leg'):
-            leg = fixture.leg
-            home = getattr(leg.home_profile, 'team_name', '?') if leg.home_profile else '?'
-            away = getattr(leg.away_profile, 'team_name', '?') if leg.away_profile else '?'
-            league = getattr(leg, 'league', '?')
-            time_str = getattr(leg, 'kickoff', '')[:16] if hasattr(leg, 'kickoff') else 'TBD'
-            return {"home": home, "away": away, "league": league, "time": time_str, "valid": True}
-        
-        # Handle dictionary format
-        if isinstance(fixture, dict):
-            # Try different possible structures
-            home = safe_get(fixture, 'teams', 'home', 'name')
-            if home == "?":
-                home = safe_get(fixture, 'homeTeam', 'name')
-            if home == "?":
-                home = safe_get(fixture, 'home_team')
-            
-            away = safe_get(fixture, 'teams', 'away', 'name')
-            if away == "?":
-                away = safe_get(fixture, 'awayTeam', 'name')
-            if away == "?":
-                away = safe_get(fixture, 'away_team')
-            
-            league = safe_get(fixture, 'league', 'name')
-            if league == "?":
-                league = safe_get(fixture, 'league_name')
-            
-            date_str = safe_get(fixture, 'fixture', 'date')
-            if date_str == "?":
-                date_str = safe_get(fixture, 'date')
-            time_str = date_str[11:16] if date_str != "?" and len(date_str) > 10 else "TBD"
-            
-            return {"home": home, "away": away, "league": league, "time": time_str, "valid": True}
-        
-        return {"valid": False}
-    except Exception as e:
-        return {"valid": False, "error": str(e)}
-
-# ========== MOCK DATA (Safe fallback) ==========
+# ========== MOCK DATA ==========
 MOCK_FIXTURES = [
     {"home": "Arsenal", "away": "Chelsea", "league": "Premier League", "time": "15:00", "odds": 2.10},
     {"home": "Manchester City", "away": "Liverpool", "league": "Premier League", "time": "17:30", "odds": 1.95},
@@ -180,19 +165,18 @@ def fetch_live_fixtures():
     """Fetch live fixtures from API"""
     fixtures = []
     
-    # Try to fetch from API-Football
     if FOOTBALL_KEY:
         with st.spinner("Fetching live fixtures..."):
-            params = {"date": datetime.now().strftime("%Y-%m-%d"), "status": "NS"}
+            params = {"date": get_current_time().strftime("%Y-%m-%d"), "status": "NS"}
             data = fetch_from_api_football("/fixtures", params)
             
             if data and data.get("response"):
                 for fx in data["response"][:20]:
-                    home = safe_get(fx, 'teams', 'home', 'name')
-                    away = safe_get(fx, 'teams', 'away', 'name')
-                    league = safe_get(fx, 'league', 'name')
-                    date_str = safe_get(fx, 'fixture', 'date')
-                    time_str = date_str[11:16] if date_str != "?" and len(date_str) > 10 else "TBD"
+                    home = fx.get("teams", {}).get("home", {}).get("name", "?")
+                    away = fx.get("teams", {}).get("away", {}).get("name", "?")
+                    league = fx.get("league", {}).get("name", "?")
+                    date_str = fx.get("fixture", {}).get("date", "")
+                    time_str = date_str[11:16] if date_str and len(date_str) > 10 else "TBD"
                     
                     fixtures.append({
                         "home": home,
@@ -206,7 +190,6 @@ def fetch_live_fixtures():
                     st.session_state.data_source = "api-football"
                     return fixtures
     
-    # Fallback to mock data
     st.session_state.data_source = "mock"
     return MOCK_FIXTURES
 
@@ -232,35 +215,36 @@ def navigate_to(page, leg=None):
         st.session_state.selected_leg = leg
     st.rerun()
 
+# ========== STATUS BAR COMPONENT ==========
+def show_status_bar():
+    """Display status bar at bottom of page"""
+    source_text = "🔴 LIVE" if st.session_state.data_source == "api-football" else "📊 DEMO"
+    source_class = "live-badge" if st.session_state.data_source == "api-football" else "demo-badge"
+    backend_status_text = "✅ Backend OK" if st.session_state.backend_status == "connected" else "⚠️ Backend Offline"
+    current_time = format_time(get_current_time())
+    
+    st.markdown(f"""
+    <div class="status-bar">
+        <div>
+            <span class="{source_class}">{source_text}</span>
+            <span style="margin-left: 1rem;">{backend_status_text}</span>
+        </div>
+        <div>
+            <span>🕐 {current_time} (GMT+3)</span>
+            <span style="margin-left: 1rem; cursor: pointer;" onclick="location.reload()">🔄 Refresh</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
+    # Main content wrapper with padding for status bar
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
+    
     st.markdown('<p class="main-header">🎯 MATCH ORACLE</p>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">AI-powered football prediction platform</p>', unsafe_allow_html=True)
     
-    # Status row
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        source_text = "🔴 LIVE" if st.session_state.data_source == "api-football" else "📊 DEMO"
-        st.markdown(f'<span class="live-badge" style="background:#3b82f6;">{source_text}</span>', unsafe_allow_html=True)
-    with col2:
-        if st.session_state.backend_status == "connected":
-            st.success("✅ Backend OK")
-        else:
-            st.warning("⚠️ Backend Offline")
-    with col3:
-        st.caption(f"🕐 {datetime.now().strftime('%H:%M:%S')}")
-    with col4:
-        if st.button("🔄 Refresh"):
-            st.cache_data.clear()
-            st.rerun()
-    
     st.divider()
-    
-    # Refresh button for live data
-    if st.button("📡 Fetch Live Fixtures", use_container_width=True):
-        with st.spinner("Fetching from API-Football..."):
-            st.session_state.live_fixtures = fetch_live_fixtures()
-            st.rerun()
     
     # Metrics Row
     m1, m2, m3, m4 = st.columns(4)
@@ -300,6 +284,12 @@ def show_dashboard():
     
     st.divider()
     
+    # Fetch live data button
+    if st.button("📡 Fetch Live Fixtures", use_container_width=True):
+        with st.spinner("Fetching from API-Football..."):
+            st.session_state.live_fixtures = fetch_live_fixtures()
+            st.rerun()
+    
     # 3-Column Layout
     c1, c2, c3 = st.columns(3)
     
@@ -317,19 +307,12 @@ def show_dashboard():
             """, unsafe_allow_html=True)
     
     with c2:
-        st.markdown("### 📊 Live Data Source")
+        st.markdown("### 📊 Data Source")
         if FOOTBALL_KEY:
             st.success("✅ API-Football Key Configured")
-            st.code(f"Key: {FOOTBALL_KEY[:6]}...{FOOTBALL_KEY[-4:]}")
         else:
             st.warning("⚠️ No API Key")
             st.info("Add APIFOOTBALL_KEY to secrets")
-        
-        st.markdown("### 🔌 Backend")
-        if st.session_state.backend_status == "connected":
-            st.success(f"Connected")
-        else:
-            st.error("Not connected")
     
     with c3:
         st.markdown("### 📈 Actions")
@@ -360,9 +343,12 @@ def show_dashboard():
             <div style="font-size:0.8rem;color:#64748b;">Kickoff: {fixture.get('time', 'TBD')}</div>
         </div>
         """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ========== ALL LEGS PAGE ==========
 def show_all_legs():
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     st.markdown('<p class="main-header">📋 All Fixtures</p>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([3, 1])
@@ -374,7 +360,6 @@ def show_all_legs():
     
     fixtures = st.session_state.live_fixtures
     
-    # Filter
     if search:
         s = search.lower()
         fixtures = [f for f in fixtures if 
@@ -399,9 +384,12 @@ def show_all_legs():
             st.divider()
     else:
         st.info("No fixtures found")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ========== PARLAYS PAGE ==========
 def show_parlays():
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     st.markdown('<p class="main-header">🔗 Parlays & ACCA Slips</p>', unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
@@ -429,9 +417,12 @@ def show_parlays():
     if len(fixtures) >= 4:
         f1, f2, f3, f4 = fixtures[0], fixtures[1], fixtures[2], fixtures[3]
         st.markdown(f"**{f1.get('home', '?')} (2.10) + {f2.get('home', '?')} (1.85) + {f3.get('home', '?')} (1.95) + {f4.get('home', '?')} (1.75) = 13.27x**")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ========== CALENDAR PAGE ==========
 def show_calendar():
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     st.markdown('<p class="main-header">📅 Oracle Calendar</p>', unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
@@ -439,7 +430,7 @@ def show_calendar():
     
     st.divider()
     
-    date = st.date_input("Select Date", datetime.now().date())
+    date = st.date_input("Select Date", get_current_time().date())
     
     if st.button("🔍 Scan Selected Date", use_container_width=True):
         with st.spinner("Scanning fixtures..."):
@@ -454,9 +445,12 @@ def show_calendar():
             <div style="font-size:0.8rem;">{fixture.get('league', '?')} • {fixture.get('time', 'TBD')}</div>
         </div>
         """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ========== SETTINGS PAGE ==========
 def show_settings():
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     st.markdown('<p class="main-header">⚙️ Settings</p>', unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
@@ -483,13 +477,10 @@ def show_settings():
         else:
             st.error("❌ Cannot connect to backend")
     
-    st.markdown("### Data Source")
-    st.write(f"Current source: **{st.session_state.data_source.upper()}**")
+    st.markdown("### Timezone")
+    st.info("📍 Timezone: GMT+3 (Nairobi)")
     
-    if st.button("Force Fetch Live Data"):
-        with st.spinner("Fetching..."):
-            st.session_state.live_fixtures = fetch_live_fixtures()
-            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ========== MAIN ==========
 def main():
@@ -528,15 +519,7 @@ def main():
         
         st.divider()
         
-        if st.session_state.backend_status == "connected":
-            st.success("✅ Backend Connected")
-        else:
-            st.warning("⚠️ Backend Offline")
-        
-        st.divider()
-        
-        st.caption(f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        st.caption("🎯 Match Oracle v3.0")
+        st.caption(f"🎯 Match Oracle v3.0")
         st.caption(f"📡 Source: {st.session_state.data_source.upper()}")
     
     # Page routing
@@ -551,6 +534,9 @@ def main():
         show_calendar()
     elif page == "settings":
         show_settings()
+    
+    # Status bar at bottom (shown on all pages)
+    show_status_bar()
 
 if __name__ == "__main__":
     main()
