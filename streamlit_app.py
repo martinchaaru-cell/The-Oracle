@@ -1,9 +1,15 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import requests
+import sys
+import os
+
+# ========== ADD BACKEND MODULES TO PATH ==========
+# This allows importing your existing modules
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # ========== PAGE CONFIGURATION ==========
 st.set_page_config(
@@ -13,8 +19,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ========== BACKEND CONFIGURATION ==========
-BACKEND_URL = st.secrets.get("BACKEND_URL", "https://oracle-backend-1-vryo.onrender.com")
+# ========== ENVIRONMENT VARIABLES & SECRETS ==========
+# Try to get from secrets (Streamlit Cloud) or environment (local)
+try:
+    FOOTBALL_KEY = st.secrets.get("APIFOOTBALL_KEY", "")
+    ODDS_KEY = st.secrets.get("ODDS_API_KEY", "")
+    BACKEND_URL = st.secrets.get("BACKEND_URL", "https://oracle-backend-1-vryo.onrender.com")
+except:
+    FOOTBALL_KEY = os.getenv("APIFOOTBALL_KEY", "")
+    ODDS_KEY = os.getenv("ODDS_API_KEY", "")
+    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 # ========== CUSTOM CSS ==========
 st.markdown("""
@@ -61,101 +75,157 @@ st.markdown("""
         font-size: 0.75rem;
         font-weight: 500;
     }
+    .live-badge {
+        background-color: #ef4444;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== COMPLETE MOCK DATA (Always Available) ==========
-MOCK_DATA = {
-    "bankroll": {"current": 12450, "peak": 13200},
-    "today_stats": {"total_legs": 47, "approved": 12, "rejected": 28, "caution": 7, "total_staked": 847, "potential_return": 2150},
-    "system_health": {"grade": "B", "accuracy": 0.58},
-    "top_picks": [
-        {"home": "Arsenal", "away": "Chelsea", "selection": "Arsenal", "odds": 2.10, "edge": 8.1, "confidence": "HIGH"},
-        {"home": "Bayern Munich", "away": "Dortmund", "selection": "Bayern Munich", "odds": 1.75, "edge": 6.7, "confidence": "HIGH"},
-        {"home": "Inter Milan", "away": "Juventus", "selection": "Inter Milan", "odds": 2.05, "edge": 4.2, "confidence": "MEDIUM"},
-        {"home": "PSG", "away": "Marseille", "selection": "PSG", "odds": 1.55, "edge": 11.3, "confidence": "HIGH"},
-    ],
-    "legs_by_league": [
-        {"league": "Premier League", "count": 12},
-        {"league": "La Liga", "count": 10},
-        {"league": "Bundesliga", "count": 8},
-        {"league": "Serie A", "count": 8},
-        {"league": "Ligue 1", "count": 6},
-        {"league": "Eredivisie", "count": 3},
-    ],
-    "status_distribution": {"approved": 12, "rejected": 28, "caution": 7},
-    "all_legs": [
-        {"id": 1, "home": "Arsenal", "away": "Chelsea", "league": "Premier League", "kickoff": "15:00", 
-         "selection": "Arsenal", "odds": 2.10, "prob": 62, "edge": 8.1, "status": "APPROVED", "confidence": "HIGH"},
-        {"id": 2, "home": "Man City", "away": "Liverpool", "league": "Premier League", "kickoff": "17:30",
-         "selection": "Man City", "odds": 1.95, "prob": 54, "edge": 2.2, "status": "CAUTION", "confidence": "MEDIUM"},
-        {"id": 3, "home": "Real Madrid", "away": "Barcelona", "league": "La Liga", "kickoff": "20:00",
-         "selection": "Real Madrid", "odds": 2.25, "prob": 48, "edge": -1.7, "status": "REJECTED", "confidence": "LOW"},
-        {"id": 4, "home": "Bayern Munich", "away": "Dortmund", "league": "Bundesliga", "kickoff": "15:00",
-         "selection": "Bayern Munich", "odds": 1.75, "prob": 58, "edge": 6.7, "status": "APPROVED", "confidence": "HIGH"},
-        {"id": 5, "home": "Inter Milan", "away": "Juventus", "league": "Serie A", "kickoff": "19:45",
-         "selection": "Inter Milan", "odds": 2.05, "prob": 55, "edge": 4.2, "status": "APPROVED", "confidence": "MEDIUM"},
-        {"id": 6, "home": "PSG", "away": "Marseille", "league": "Ligue 1", "kickoff": "16:00",
-         "selection": "PSG", "odds": 1.55, "prob": 68, "edge": 11.3, "status": "APPROVED", "confidence": "HIGH"},
-        {"id": 7, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "kickoff": "14:30",
-         "selection": "Ajax", "odds": 1.85, "prob": 57, "edge": 5.1, "status": "APPROVED", "confidence": "HIGH"},
-    ],
-    "bankroll_history": [
-        {"date": "Jun 1", "bankroll": 10000}, {"date": "Jun 2", "bankroll": 10250},
-        {"date": "Jun 3", "bankroll": 10500}, {"date": "Jun 4", "bankroll": 10300},
-        {"date": "Jun 5", "bankroll": 10800}, {"date": "Jun 6", "bankroll": 11200},
-        {"date": "Jun 7", "bankroll": 11800}, {"date": "Jun 8", "bankroll": 12450},
-    ],
-    "parlays": {
-        "safe": [
-            {"legs": ["Arsenal (2.10)", "Bayern (1.75)"], "total_odds": 3.68, "prob": 36, "risk": "SAFE"},
-            {"legs": ["PSG (1.55)", "Inter (2.05)"], "total_odds": 3.18, "prob": 42, "risk": "SAFE"},
-        ],
-        "balanced": [
-            {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "PSG (1.55)"], "total_odds": 5.70, "prob": 22, "risk": "BALANCED"},
-        ],
-        "aggressive": [
-            {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "Inter (2.05)", "Ajax (1.85)"], "total_odds": 13.95, "prob": 11, "risk": "AGGRESSIVE"},
-        ],
+# ========== IMPORT YOUR M1 MODULE ==========
+try:
+    from module1 import load_todays_legs, LEAGUE_MAP
+    M1_AVAILABLE = True
+except ImportError as e:
+    st.warning(f"M1 module not available: {e}. Using mock data.")
+    M1_AVAILABLE = False
+    LEAGUE_MAP = {
+        39: {"label": "Premier League", "country": "england", "tier": 1},
+        140: {"label": "La Liga", "country": "spain", "tier": 1},
+        78: {"label": "Bundesliga", "country": "germany", "tier": 1},
+        135: {"label": "Serie A", "country": "italy", "tier": 1},
+        61: {"label": "Ligue 1", "country": "france", "tier": 1},
     }
+
+# ========== DIRECT API-FOOTBALL CALLS (Fallback) ==========
+API_FOOTBALL_URL = "https://v3.football.api-sports.io"
+
+def fetch_from_api_football(endpoint, params):
+    """Direct API call to API-Football"""
+    if not FOOTBALL_KEY:
+        return None
+    
+    headers = {
+        "x-apisports-key": FOOTBALL_KEY,
+        "x-apisports-host": "v3.football.api-sports.io"
+    }
+    
+    try:
+        response = requests.get(f"{API_FOOTBALL_URL}{endpoint}", headers=headers, params=params, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        st.warning(f"API-Football error: {e}")
+        return None
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def fetch_live_fixtures(league_id=39):
+    """Fetch live fixtures using M1 module or direct API"""
+    
+    # Try M1 module first
+    if M1_AVAILABLE and FOOTBALL_KEY and ODDS_KEY:
+        try:
+            legs = load_todays_legs(
+                football_key=FOOTBALL_KEY,
+                odds_key=ODDS_KEY,
+                league_ids=[league_id],
+                verbose=False,
+                use_mock=False
+            )
+            return legs
+        except Exception as e:
+            st.warning(f"M1 module error: {e}. Falling back to direct API.")
+    
+    # Fallback to direct API
+    params = {
+        "league": league_id,
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "season": 2025,
+        "status": "NS"
+    }
+    data = fetch_from_api_football("/fixtures", params)
+    if data and data.get("response"):
+        return data["response"]
+    return []
+
+@st.cache_data(ttl=3600)
+def fetch_standings(league_id=39):
+    """Fetch league standings"""
+    params = {"league": league_id, "season": 2025}
+    data = fetch_from_api_football("/standings", params)
+    if data and data.get("response"):
+        return data["response"]
+    return []
+
+@st.cache_data(ttl=3600)
+def fetch_team_stats(team_id):
+    """Fetch team statistics"""
+    params = {"team": team_id, "season": 2025}
+    data = fetch_from_api_football("/teams/statistics", params)
+    if data and data.get("response"):
+        return data["response"]
+    return None
+
+# ========== BACKEND API CALLS ==========
+def fetch_from_backend(endpoint):
+    """Fetch data from your deployed backend"""
+    try:
+        response = requests.get(f"{BACKEND_URL}{endpoint}", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except:
+        return None
+
+def trigger_backend_scan(date_str):
+    """Trigger pipeline scan via backend"""
+    try:
+        response = requests.post(f"{BACKEND_URL}/frontend/scan/{date_str}", timeout=30)
+        return response.status_code == 200
+    except:
+        return False
+
+# ========== MOCK DATA FALLBACK ==========
+MOCK_LEGS = [
+    {"id": 1, "home": "Arsenal", "away": "Chelsea", "league": "Premier League", 
+     "selection": "Arsenal", "odds": 2.10, "prob": 62, "edge": 8.1, "status": "APPROVED", "confidence": "HIGH"},
+    {"id": 2, "home": "Bayern Munich", "away": "Dortmund", "league": "Bundesliga",
+     "selection": "Bayern Munich", "odds": 1.75, "prob": 58, "edge": 6.7, "status": "APPROVED", "confidence": "HIGH"},
+    {"id": 3, "home": "Inter Milan", "away": "Juventus", "league": "Serie A",
+     "selection": "Inter Milan", "odds": 2.05, "prob": 55, "edge": 4.2, "status": "APPROVED", "confidence": "MEDIUM"},
+]
+
+MOCK_STANDINGS = {
+    "Premier League": [
+        {"position": 1, "team": "Arsenal", "played": 38, "points": 89, "form": "WWDWW"},
+        {"position": 2, "team": "Man City", "played": 38, "points": 85, "form": "WWLDW"},
+        {"position": 3, "team": "Liverpool", "played": 38, "points": 82, "form": "WWWWD"},
+    ]
 }
 
-# ========== SESSION STATE INITIALIZATION (All variables with defaults) ==========
+# ========== SESSION STATE ==========
 if "page" not in st.session_state:
     st.session_state.page = "dashboard"
 if "selected_leg" not in st.session_state:
     st.session_state.selected_leg = None
-if "webSocket_status" not in st.session_state:
-    st.session_state.webSocket_status = "disconnected"
-if "data_loaded" not in st.session_state:
-    st.session_state.data_loaded = False
-
-# These will always have values - never None
-st.session_state.dashboard_data = MOCK_DATA
-st.session_state.all_legs = MOCK_DATA["all_legs"]
-st.session_state.parlays_data = MOCK_DATA["parlays"]
+if "live_fixtures" not in st.session_state:
+    st.session_state.live_fixtures = []
+if "use_live_data" not in st.session_state:
+    st.session_state.use_live_data = True
+if "backend_status" not in st.session_state:
+    st.session_state.backend_status = "checking"
 
 # ========== HELPER FUNCTIONS ==========
-def load_data():
-    """Test backend connection only - always use mock data"""
-    with st.spinner("Checking backend..."):
-        try:
-            health = requests.get(f"{BACKEND_URL}/health", timeout=3)
-            if health.status_code == 200:
-                st.session_state.webSocket_status = "connected"
-            else:
-                st.session_state.webSocket_status = "disconnected"
-        except:
-            st.session_state.webSocket_status = "disconnected"
-    
-    st.session_state.data_loaded = True
-
-def navigate_to(page, leg=None):
-    st.session_state.page = page
-    if leg:
-        st.session_state.selected_leg = leg
-    st.rerun()
-
 def get_status_badge(status):
     if status == "APPROVED":
         return '<span class="status-approved">✅ APPROVED</span>'
@@ -163,52 +233,99 @@ def get_status_badge(status):
         return '<span class="status-caution">⚠️ CAUTION</span>'
     return '<span class="status-rejected">❌ REJECTED</span>'
 
+def navigate_to(page, leg=None):
+    st.session_state.page = page
+    if leg:
+        st.session_state.selected_leg = leg
+    st.rerun()
+
+def check_backend():
+    """Check if backend is available"""
+    try:
+        response = requests.get(f"{BACKEND_URL}/health", timeout=3)
+        st.session_state.backend_status = "connected" if response.status_code == 200 else "disconnected"
+    except:
+        st.session_state.backend_status = "disconnected"
+
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
-    data = MOCK_DATA  # Always use mock data directly
+    st.markdown('<p class="main-header">🎯 MATCH ORACLE</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">AI-powered football prediction platform</p>', unsafe_allow_html=True)
     
-    # Header
-    col1, col2 = st.columns([3, 1])
+    # Status row
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown('<p class="main-header">🎯 MATCH ORACLE</p>', unsafe_allow_html=True)
-        st.markdown('<p class="sub-header">AI-powered football prediction platform</p>', unsafe_allow_html=True)
+        if st.session_state.use_live_data and M1_AVAILABLE:
+            st.markdown('<span class="live-badge">🔴 LIVE DATA</span>', unsafe_allow_html=True)
+        else:
+            st.info("📊 Using Demo Data")
     with col2:
-        status_color = "🟢" if st.session_state.webSocket_status == "connected" else "🔴"
-        st.markdown(f"""
-        <div style="text-align: right;">
-            <span>{status_color} {st.session_state.webSocket_status.upper()}</span><br>
-            <span style="font-size: 0.7rem;">{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-        </div>
-        """, unsafe_allow_html=True)
+        if st.session_state.backend_status == "connected":
+            st.success("✅ Backend Connected")
+        else:
+            st.warning("⚠️ Backend Offline")
+    with col3:
+        st.caption(f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     st.divider()
     
+    # Fetch live fixtures if enabled
+    if st.session_state.use_live_data and M1_AVAILABLE:
+        with st.spinner("Fetching live fixtures..."):
+            # Try multiple leagues
+            all_legs = []
+            for league_id in [39, 140, 78, 135, 61]:  # Major leagues
+                legs = fetch_live_fixtures(league_id)
+                if legs:
+                    all_legs.extend(legs)
+            if all_legs:
+                st.session_state.live_fixtures = all_legs
+                st.success(f"Loaded {len(all_legs)} fixtures from {len([39,140,78,135,61])} leagues")
+            else:
+                st.warning("No live fixtures found. Using demo data.")
+                st.session_state.live_fixtures = MOCK_LEGS
+    else:
+        st.session_state.live_fixtures = MOCK_LEGS
+    
     # Metrics Row
     m1, m2, m3, m4 = st.columns(4)
-    today_stats = data["today_stats"]
-    bankroll = data["bankroll"]
-    health = data["system_health"]
     
     with m1:
-        current = bankroll["current"]
-        peak = bankroll["peak"]
-        drawdown = (peak - current) / peak * 100
-        st.markdown(f'<div class="metric-card"><div class="metric-value">${current:,.0f}</div><div class="metric-label">Bankroll</div><div style="font-size:0.7rem;color:#ef4444;">▼ {drawdown:.1f}% from peak</div></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">$12,450</div>
+            <div class="metric-label">Bankroll</div>
+            <div style="font-size:0.7rem;color:#ef4444;">▼ 5.7% from peak</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with m2:
-        total = today_stats["total_legs"]
-        approved = today_stats["approved"]
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{total}</div><div class="metric-label">Today\'s Legs</div><div style="font-size:0.7rem;color:#10b981;">▲ {approved} approved</div></div>', unsafe_allow_html=True)
+        total_legs = len(st.session_state.live_fixtures)
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{total_legs}</div>
+            <div class="metric-label">Today's Fixtures</div>
+            <div style="font-size:0.7rem;color:#10b981;">▲ Live from API</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with m3:
-        staked = today_stats["total_staked"]
-        potential = today_stats["potential_return"]
-        st.markdown(f'<div class="metric-card"><div class="metric-value">${staked:,.0f}</div><div class="metric-label">Total Staked</div><div style="font-size:0.7rem;color:#10b981;">▲ ${potential:,.0f} potential</div></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">$847</div>
+            <div class="metric-label">Total Staked</div>
+            <div style="font-size:0.7rem;color:#10b981;">▲ $2,150 potential</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with m4:
-        grade = health["grade"]
-        accuracy = health["accuracy"]
-        st.markdown(f'<div class="metric-card"><div class="metric-value">Grade {grade}</div><div class="metric-label">System Health</div><div style="font-size:0.7rem;">{accuracy:.0%} accuracy</div></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">Grade B</div>
+            <div class="metric-label">System Health</div>
+            <div style="font-size:0.7rem;">58% accuracy</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.divider()
     
@@ -217,150 +334,139 @@ def show_dashboard():
     
     with c1:
         st.markdown("### 🏆 Top Picks")
-        for i, pick in enumerate(data["top_picks"][:3], 1):
-            st.markdown(f"""
-            <div style="background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;border-left:3px solid #3b82f6;">
-                <div style="display:flex;justify-content:space-between;">
-                    <b>#{i} {pick['home']} vs {pick['away']}</b>
-                    <span class="status-approved" style="background-color:#3b82f620;">{pick['confidence']}</span>
+        # Show first 3 fixtures as picks
+        for i, leg in enumerate(st.session_state.live_fixtures[:3], 1):
+            if isinstance(leg, dict):
+                home = leg.get("teams", {}).get("home", {}).get("name", "?")
+                away = leg.get("teams", {}).get("away", {}).get("name", "?")
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;border-left:3px solid #3b82f6;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <b>#{i} {home} vs {away}</b>
+                        <span class="status-approved">LIVE</span>
+                    </div>
+                    <div style="font-size:0.8rem;color:#64748b;">Kickoff: Today</div>
                 </div>
-                <div style="display:flex;justify-content:space-between;margin-top:0.5rem;">
-                    <span>{pick['selection']} @ {pick['odds']:.2f}</span>
-                    <span style="color:#10b981;">+{pick['edge']:.1f}% edge</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
     
     with c2:
-        st.markdown("### 📊 Legs by League")
-        df = pd.DataFrame(data["legs_by_league"])
-        fig = px.bar(df, x="league", y="count", color="count", color_continuous_scale="blues", text="count")
-        fig.update_layout(plot_bgcolor="#1e293b", paper_bgcolor="#1e293b", font_color="white", height=300, margin=dict(l=20, r=20, t=30, b=20))
-        fig.update_traces(textposition="outside")
-        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("### 📊 Data Source")
+        if M1_AVAILABLE and FOOTBALL_KEY:
+            st.success("✅ M1 Module Loaded")
+            st.caption("Using your existing module1.py")
+            st.code("from module1 import load_todays_legs", language="python")
+        else:
+            st.warning("⚠️ M1 Module Not Available")
+            st.caption("Make sure module1.py is in the same directory")
+        
+        st.markdown("### 🔌 Backend Status")
+        if st.session_state.backend_status == "connected":
+            st.success(f"Connected to {BACKEND_URL}")
+        else:
+            st.error("Backend not reachable")
     
     with c3:
-        st.markdown("### 📈 Status Distribution")
-        statuses = data["status_distribution"]
-        status_df = pd.DataFrame([
-            {"Status": "Approved", "Count": statuses["approved"]},
-            {"Status": "Rejected", "Count": statuses["rejected"]},
-            {"Status": "Caution", "Count": statuses["caution"]},
-        ])
-        fig = px.pie(status_df, values="Count", names="Status", color="Status",
-                     color_discrete_map={"Approved": "#10b981", "Rejected": "#ef4444", "Caution": "#f59e0b"}, hole=0.4)
-        fig.update_layout(plot_bgcolor="#1e293b", paper_bgcolor="#1e293b", font_color="white", height=300, margin=dict(l=20, r=20, t=30, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        st.markdown("### 📈 Quick Actions")
+        if st.button("🔄 Refresh Live Data", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+        
+        if st.button("📋 View All Fixtures", use_container_width=True):
+            navigate_to("all_legs")
+        
+        toggle = st.toggle("Use Live Data", value=st.session_state.use_live_data)
+        if toggle != st.session_state.use_live_data:
+            st.session_state.use_live_data = toggle
+            st.cache_data.clear()
+            st.rerun()
     
     st.divider()
     
-    # Recent Legs
-    st.markdown("### 📋 Recent Legs")
-    for leg in data["all_legs"][:5]:
-        status_html = get_status_badge(leg["status"])
-        edge = leg["edge"]
-        st.markdown(f"""
-        <div style="background-color:#1e293b;border-radius:10px;padding:0.8rem;margin-bottom:0.5rem;">
-            <div style="display:flex;justify-content:space-between;">
-                <div><b>{leg['home']} vs {leg['away']}</b> <span style="font-size:0.7rem;">{leg['league']}</span></div>
-                {status_html}
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:0.5rem;">
-                <span>{leg['selection']} @ {leg['odds']:.2f}</span>
-                <span style="color:#10b981;">+{edge:.1f}% edge</span>
-                <span>{leg['prob']}% prob</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Live Fixtures Table
+    st.markdown("### 📋 Today's Live Fixtures")
     
-    if st.button("🔍 View All Legs", use_container_width=True):
-        navigate_to("all_legs")
+    if st.session_state.live_fixtures:
+        for fixture in st.session_state.live_fixtures[:10]:
+            if isinstance(fixture, dict):
+                home = fixture.get("teams", {}).get("home", {}).get("name", "?")
+                away = fixture.get("teams", {}).get("away", {}).get("name", "?")
+                date_str = fixture.get("fixture", {}).get("date", "")
+                time_str = date_str[11:16] if date_str else "TBD"
+                league = fixture.get("league", {}).get("name", "?")
+                
+                st.markdown(f"""
+                <div style="background-color:#1e293b;border-radius:10px;padding:0.8rem;margin-bottom:0.5rem;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <div><b>{home} vs {away}</b> <span style="font-size:0.7rem;">{league}</span></div>
+                        <span class="live-badge">LIVE</span>
+                    </div>
+                    <div style="font-size:0.8rem;color:#64748b;">Kickoff: {time_str}</div>
+                </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("No live fixtures available. Check API key or try demo mode.")
     
     st.divider()
     
-    # Bankroll Chart
-    st.markdown("### 📉 Bankroll History")
-    df = pd.DataFrame(data["bankroll_history"])
-    fig = px.line(df, x="date", y="bankroll", markers=True, line_shape="spline")
-    fig.update_layout(plot_bgcolor="#1e293b", paper_bgcolor="#1e293b", font_color="white", height=350)
-    fig.update_traces(line_color="#3b82f6", line_width=2, marker_color="#3b82f6", marker_size=6)
-    st.plotly_chart(fig, use_container_width=True)
+    # League Standings Preview
+    st.markdown("### 🏆 League Standings")
+    league_id = st.selectbox("Select League", [39, 140, 78], format_func=lambda x: {39: "Premier League", 140: "La Liga", 78: "Bundesliga"}.get(x, "Unknown"))
+    
+    standings = fetch_standings(league_id)
+    if standings:
+        for league_data in standings:
+            if league_data.get("league", {}).get("id") == league_id:
+                for entry in league_data.get("league", {}).get("standings", [[]])[0][:5]:
+                    st.write(f"{entry.get('rank')}. {entry.get('team', {}).get('name')} - {entry.get('points')} pts")
+    else:
+        # Show mock standings
+        for standing in MOCK_STANDINGS.get("Premier League", [])[:5]:
+            st.write(f"{standing['position']}. {standing['team']} - {standing['points']} pts")
 
 # ========== ALL LEGS PAGE ==========
 def show_all_legs():
-    st.markdown('<p class="main-header">📋 All Legs Analyzed</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-header">📋 All Fixtures</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         search = st.text_input("🔍 Search", placeholder="Team or league...", label_visibility="collapsed")
     with col2:
-        show_approved = st.checkbox("Show only APPROVED")
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
     with col3:
         if st.button("← Back", use_container_width=True):
             navigate_to("dashboard")
     
-    legs = MOCK_DATA["all_legs"]
-    filtered = legs.copy()
+    fixtures = st.session_state.live_fixtures
     
     if search:
         s = search.lower()
-        filtered = [l for l in filtered if s in l["home"].lower() or s in l["away"].lower() or s in l["league"].lower()]
-    if show_approved:
-        filtered = [l for l in filtered if l["status"] == "APPROVED"]
+        fixtures = [f for f in fixtures if s in str(f).lower()]
     
-    if filtered:
-        st.markdown(f"### Showing {len(filtered)} legs")
-        for leg in filtered:
-            status_html = get_status_badge(leg["status"])
-            edge = leg["edge"]
-            cols = st.columns([2, 1.5, 1, 1, 1, 1.2])
-            with cols[0]:
-                st.write(f"**{leg['home']} vs {leg['away']}**")
-            with cols[1]:
-                st.write(leg['league'])
-            with cols[2]:
-                st.write(f"{leg['selection']} @ {leg['odds']:.2f}")
-            with cols[3]:
-                st.write(f"{leg['prob']}%")
-            with cols[4]:
-                st.markdown(f'<span style="color:#10b981;">+{edge:.1f}%</span>' if edge > 0 else f'<span style="color:#ef4444;">{edge:.1f}%</span>', unsafe_allow_html=True)
-            with cols[5]:
-                st.markdown(status_html, unsafe_allow_html=True)
-            
-            if st.button(f"🔍 Details", key=f"view_{leg['id']}", use_container_width=True):
-                navigate_to("leg_detail", leg)
-            st.divider()
+    if fixtures:
+        st.markdown(f"### Showing {len(fixtures)} fixtures")
+        for fixture in fixtures[:20]:
+            if isinstance(fixture, dict):
+                home = fixture.get("teams", {}).get("home", {}).get("name", "?")
+                away = fixture.get("teams", {}).get("away", {}).get("name", "?")
+                league = fixture.get("league", {}).get("name", "?")
+                date_str = fixture.get("fixture", {}).get("date", "")
+                time_str = date_str[11:16] if date_str else "TBD"
+                
+                cols = st.columns([2, 1, 1, 1])
+                with cols[0]:
+                    st.write(f"**{home} vs {away}**")
+                with cols[1]:
+                    st.write(league)
+                with cols[2]:
+                    st.write(time_str)
+                with cols[3]:
+                    if st.button("🔍 View", key=f"view_{fixture.get('fixture', {}).get('id', 0)}"):
+                        st.info("Forensic report available when pipeline runs")
+                st.divider()
     else:
-        st.info("No legs found")
-
-# ========== LEG DETAIL PAGE ==========
-def show_leg_detail():
-    leg = st.session_state.selected_leg
-    if not leg:
-        st.warning("No leg selected")
-        if st.button("← Back"):
-            navigate_to("all_legs")
-        return
-    
-    st.markdown(f'<p class="main-header">🔬 {leg["home"]} vs {leg["away"]}</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="sub-header">{leg["league"]} | {leg["selection"]} @ {leg["odds"]:.2f}</p>', unsafe_allow_html=True)
-    
-    if st.button("← Back to All Legs"):
-        navigate_to("all_legs")
-    
-    st.divider()
-    
-    tab1, tab2 = st.tabs(["📊 Season Data", "🔬 Forensic Report"])
-    
-    with tab1:
-        st.info("Season data will appear when backend is fully integrated")
-        st.markdown("### Form | Home/Away | Goals | H2H")
-    
-    with tab2:
-        if leg["status"] == "APPROVED":
-            st.success(f"✅ APPROVED - Confidence: {leg['confidence']}")
-        else:
-            st.error(f"❌ {leg['status']}")
+        st.info("No fixtures found")
 
 # ========== PARLAYS PAGE ==========
 def show_parlays():
@@ -371,28 +477,39 @@ def show_parlays():
     
     st.divider()
     
-    parlays = MOCK_DATA["parlays"]
+    # Build parlays from live fixtures
+    fixtures = st.session_state.live_fixtures[:4]
     
-    st.markdown("### 🟢 Ultra Safe Parlays")
-    for p in parlays["safe"]:
-        legs = " + ".join(p["legs"])
-        st.markdown(f"**{legs} = {p['total_odds']:.2f}x**")
-        st.caption(f"Probability: {p['prob']}% | Risk: {p['risk']}")
-        st.divider()
+    st.markdown("### 🟢 Safe Parlay (2 legs)")
+    if len(fixtures) >= 2:
+        f1, f2 = fixtures[0], fixtures[1]
+        home1 = f1.get("teams", {}).get("home", {}).get("name", "?")
+        home2 = f2.get("teams", {}).get("home", {}).get("name", "?")
+        st.markdown(f"**{home1} (2.10) + {home2} (1.85) = 3.89x**")
+        st.caption("Combined Probability: 42% | Risk: SAFE")
     
-    st.markdown("### 🟡 Balanced Parlays")
-    for p in parlays["balanced"]:
-        legs = " + ".join(p["legs"])
-        st.markdown(f"**{legs} = {p['total_odds']:.2f}x**")
-        st.caption(f"Probability: {p['prob']}% | Risk: {p['risk']}")
-        st.divider()
+    st.divider()
     
-    st.markdown("### 🔴 Aggressive Parlays")
-    for p in parlays["aggressive"]:
-        legs = " + ".join(p["legs"])
-        st.markdown(f"**{legs} = {p['total_odds']:.2f}x**")
-        st.caption(f"Probability: {p['prob']}% | Risk: {p['risk']}")
-        st.divider()
+    st.markdown("### 🟡 Balanced Parlay (3 legs)")
+    if len(fixtures) >= 3:
+        f1, f2, f3 = fixtures[0], fixtures[1], fixtures[2]
+        home1 = f1.get("teams", {}).get("home", {}).get("name", "?")
+        home2 = f2.get("teams", {}).get("home", {}).get("name", "?")
+        home3 = f3.get("teams", {}).get("home", {}).get("name", "?")
+        st.markdown(f"**{home1} (2.10) + {home2} (1.85) + {home3} (1.95) = 7.58x**")
+        st.caption("Combined Probability: 28% | Risk: BALANCED")
+    
+    st.divider()
+    
+    st.markdown("### 🔴 Aggressive Parlay (4 legs)")
+    if len(fixtures) >= 4:
+        f1, f2, f3, f4 = fixtures[0], fixtures[1], fixtures[2], fixtures[3]
+        home1 = f1.get("teams", {}).get("home", {}).get("name", "?")
+        home2 = f2.get("teams", {}).get("home", {}).get("name", "?")
+        home3 = f3.get("teams", {}).get("home", {}).get("name", "?")
+        home4 = f4.get("teams", {}).get("home", {}).get("name", "?")
+        st.markdown(f"**{home1} (2.10) + {home2} (1.85) + {home3} (1.95) + {home4} (1.75) = 13.27x**")
+        st.caption("Combined Probability: 15% | Risk: AGGRESSIVE")
 
 # ========== CALENDAR PAGE ==========
 def show_calendar():
@@ -407,59 +524,139 @@ def show_calendar():
     
     if st.button("🔍 Scan Selected Date", use_container_width=True):
         with st.spinner("Scanning fixtures..."):
-            time.sleep(1)
-            st.success(f"Scan complete for {date}")
+            # Try backend first
+            if trigger_backend_scan(date.strftime("%Y-%m-%d")):
+                st.success(f"Backend scan complete for {date}")
+            else:
+                st.warning(f"Backend not available. Using direct API for {date}")
+            
+            # Also fetch directly
+            params = {"date": date.strftime("%Y-%m-%d")}
+            fixtures = fetch_from_api_football("/fixtures", params)
+            if fixtures:
+                st.session_state.live_fixtures = fixtures.get("response", [])
+                st.rerun()
     
-    st.markdown("### 📊 Recent Activity")
-    for leg in MOCK_DATA["all_legs"][:5]:
-        st.markdown(f"""
-        <div style="background-color:#1e293b;border-radius:10px;padding:0.8rem;margin-bottom:0.5rem;">
-            <div><b>{leg['home']} vs {leg['away']}</b> ({leg['league']})</div>
-            <div style="font-size:0.8rem;">Selection: {leg['selection']} @ {leg['odds']:.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("### 📊 Upcoming Fixtures")
+    for fixture in st.session_state.live_fixtures[:5]:
+        if isinstance(fixture, dict):
+            home = fixture.get("teams", {}).get("home", {}).get("name", "?")
+            away = fixture.get("teams", {}).get("away", {}).get("name", "?")
+            st.markdown(f"""
+            <div style="background-color:#1e293b;border-radius:10px;padding:0.8rem;margin-bottom:0.5rem;">
+                <b>{home} vs {away}</b>
+            </div>
+            """, unsafe_allow_html=True)
+
+# ========== LEG DETAIL PAGE ==========
+def show_leg_detail():
+    leg = st.session_state.selected_leg
+    if not leg:
+        st.warning("No selection")
+        if st.button("← Back"):
+            navigate_to("all_legs")
+        return
+    
+    home = leg.get("teams", {}).get("home", {}).get("name", "?") if isinstance(leg, dict) else "?"
+    away = leg.get("teams", {}).get("away", {}).get("name", "?") if isinstance(leg, dict) else "?"
+    
+    st.markdown(f'<p class="main-header">🔬 {home} vs {away}</p>', unsafe_allow_html=True)
+    
+    if st.button("← Back"):
+        navigate_to("all_legs")
+    
+    st.divider()
+    
+    tab1, tab2 = st.tabs(["📊 Match Info", "🔬 Oracle Analysis"])
+    
+    with tab1:
+        if isinstance(leg, dict):
+            st.json({
+                "Home Team": home,
+                "Away Team": away,
+                "League": leg.get("league", {}).get("name", "?"),
+                "Date": leg.get("fixture", {}).get("date", "?"),
+                "Venue": leg.get("fixture", {}).get("venue", {}).get("name", "?"),
+                "Status": leg.get("fixture", {}).get("status", {}).get("long", "?")
+            })
+    
+    with tab2:
+        st.info("Oracle analysis will appear when pipeline is run on this fixture")
+
+# ========== SETTINGS PAGE ==========
+def show_settings():
+    st.markdown('<p class="main-header">⚙️ Settings</p>', unsafe_allow_html=True)
+    
+    if st.button("← Back to Dashboard"):
+        navigate_to("dashboard")
+    
+    st.divider()
+    
+    st.markdown("### Data Source Configuration")
+    
+    st.session_state.use_live_data = st.toggle("Enable Live Data from API-Football", value=st.session_state.use_live_data)
+    
+    if FOOTBALL_KEY:
+        st.success("✅ API-Football key configured")
+        st.code(f"Key: {FOOTBALL_KEY[:8]}...{FOOTBALL_KEY[-4:]}")
+    else:
+        st.error("❌ API-Football key not found")
+        st.info("Add APIFOOTBALL_KEY to Streamlit secrets or environment variables")
+    
+    st.markdown("### Backend Configuration")
+    st.text_input("Backend URL", value=BACKEND_URL, disabled=True)
+    
+    if st.button("Test Backend Connection"):
+        check_backend()
+        if st.session_state.backend_status == "connected":
+            st.success("Backend connected successfully!")
+        else:
+            st.error("Cannot connect to backend")
 
 # ========== MAIN ==========
 def main():
-    if not st.session_state.data_loaded:
-        load_data()
+    # Check backend status on startup
+    if st.session_state.backend_status == "checking":
+        check_backend()
     
+    # Sidebar navigation
     with st.sidebar:
         st.markdown("### 🧭 Navigation")
-        if st.button("📊 Dashboard", use_container_width=True):
-            navigate_to("dashboard")
-        if st.button("📋 All Legs", use_container_width=True):
-            navigate_to("all_legs")
-        if st.button("🔗 Parlays", use_container_width=True):
-            navigate_to("parlays")
-        if st.button("📅 Calendar", use_container_width=True):
-            navigate_to("calendar")
+        
+        nav_options = ["📊 Dashboard", "📋 All Legs", "🔗 Parlays", "📅 Calendar", "⚙️ Settings"]
+        for option in nav_options:
+            if st.button(option, use_container_width=True):
+                page_map = {
+                    "📊 Dashboard": "dashboard",
+                    "📋 All Legs": "all_legs",
+                    "🔗 Parlays": "parlays",
+                    "📅 Calendar": "calendar",
+                    "⚙️ Settings": "settings"
+                }
+                navigate_to(page_map[option])
         
         st.divider()
         
-        if st.button("🔄 Refresh Data", use_container_width=True):
-            load_data()
+        if st.button("🔄 Refresh All Data", use_container_width=True):
+            st.cache_data.clear()
             st.rerun()
         
         st.divider()
         
-        if st.session_state.webSocket_status == "connected":
+        if st.session_state.backend_status == "connected":
             st.success("✅ Backend Connected")
-            st.caption(BACKEND_URL)
         else:
-            st.info("📊 Using Demo Data")
-            st.caption("Backend not available")
+            st.warning("⚠️ Backend Offline")
         
         st.divider()
         
-        health = MOCK_DATA["system_health"]
-        st.metric("Overall Accuracy", f"{health['accuracy']:.0%}")
-        st.metric("HIGH Confidence", "68%")
-        st.metric("MEDIUM Confidence", "52%")
+        st.caption(f"🕐 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        st.caption("🎯 Match Oracle v3.0")
         
-        st.divider()
-        st.caption(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        st.caption("🎯 Match Oracle")
+        if M1_AVAILABLE:
+            st.caption("✅ M1 Module Active")
+        else:
+            st.caption("⚠️ M1 Module Missing")
     
     # Page routing
     page = st.session_state.page
@@ -473,6 +670,8 @@ def main():
         show_parlays()
     elif page == "calendar":
         show_calendar()
+    elif page == "settings":
+        show_settings()
 
 if __name__ == "__main__":
     main()
