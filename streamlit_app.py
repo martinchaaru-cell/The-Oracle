@@ -73,8 +73,14 @@ if "webSocket_status" not in st.session_state:
     st.session_state.webSocket_status = "disconnected"
 if "data_loaded" not in st.session_state:
     st.session_state.data_loaded = False
+if "all_legs" not in st.session_state:
+    st.session_state.all_legs = []
+if "dashboard_data" not in st.session_state:
+    st.session_state.dashboard_data = None
+if "parlays_data" not in st.session_state:
+    st.session_state.parlays_data = None
 
-# ========== COMPLETE MOCK DATA (Matches Your UI Design) ==========
+# ========== COMPLETE MOCK DATA ==========
 MOCK_DATA = {
     "bankroll": {"current": 12450, "peak": 13200, "drawdown": 5.7},
     "today_stats": {"total_legs": 47, "approved": 12, "rejected": 28, "caution": 7, "total_staked": 847, "potential_return": 2150},
@@ -131,18 +137,6 @@ MOCK_DATA = {
 }
 
 # ========== HELPER FUNCTIONS ==========
-def fetch_from_backend(endpoint, fallback):
-    """Try to fetch from backend, return fallback on failure"""
-    try:
-        response = requests.get(f"{BACKEND_URL}{endpoint}", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data and isinstance(data, dict) and len(data) > 0:
-                return data
-        return fallback
-    except Exception:
-        return fallback
-
 def load_data():
     """Load data with backend fallback"""
     with st.spinner("Loading data..."):
@@ -151,24 +145,15 @@ def load_data():
             health = requests.get(f"{BACKEND_URL}/health", timeout=3)
             if health.status_code == 200:
                 st.session_state.webSocket_status = "connected"
-                # Try to fetch real data, but keep mock as fallback
-                dashboard = fetch_from_backend("/frontend/dashboard", MOCK_DATA)
-                legs = fetch_from_backend("/frontend/legs", MOCK_DATA["all_legs"])
-                bankroll = fetch_from_backend("/frontend/bankroll", MOCK_DATA)
-                performance = fetch_from_backend("/frontend/performance", MOCK_DATA)
-                parlays = fetch_from_backend("/frontend/parlays", MOCK_DATA["parlays"])
             else:
                 st.session_state.webSocket_status = "disconnected"
-                dashboard, legs, bankroll, performance, parlays = MOCK_DATA, MOCK_DATA["all_legs"], MOCK_DATA, MOCK_DATA, MOCK_DATA["parlays"]
         except:
             st.session_state.webSocket_status = "disconnected"
-            dashboard, legs, bankroll, performance, parlays = MOCK_DATA, MOCK_DATA["all_legs"], MOCK_DATA, MOCK_DATA, MOCK_DATA["parlays"]
         
-        st.session_state.dashboard_data = dashboard if isinstance(dashboard, dict) else MOCK_DATA
-        st.session_state.all_legs = legs if isinstance(legs, list) else MOCK_DATA["all_legs"]
-        st.session_state.bankroll_data = bankroll if isinstance(bankroll, dict) else MOCK_DATA
-        st.session_state.performance_data = performance if isinstance(performance, dict) else MOCK_DATA
-        st.session_state.parlays_data = parlays if isinstance(parlays, dict) else MOCK_DATA["parlays"]
+        # Always use mock data for now (backend endpoints need to be implemented)
+        st.session_state.dashboard_data = MOCK_DATA
+        st.session_state.all_legs = MOCK_DATA["all_legs"]
+        st.session_state.parlays_data = MOCK_DATA["parlays"]
 
 def navigate_to(page, leg=None):
     st.session_state.page = page
@@ -186,8 +171,6 @@ def get_status_badge(status):
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
     data = st.session_state.get("dashboard_data", MOCK_DATA)
-    bankroll = st.session_state.get("bankroll_data", MOCK_DATA)
-    perf = st.session_state.get("performance_data", MOCK_DATA)
     
     # Header
     col1, col2 = st.columns([3, 1])
@@ -210,8 +193,8 @@ def show_dashboard():
     today_stats = data.get("today_stats", MOCK_DATA["today_stats"])
     
     with m1:
-        current = bankroll.get("current", 12450)
-        peak = bankroll.get("peak", 13200)
+        current = data.get("bankroll", {}).get("current", 12450)
+        peak = data.get("bankroll", {}).get("peak", 13200)
         drawdown = (peak - current) / peak * 100 if peak > 0 else 0
         st.markdown(f'<div class="metric-card"><div class="metric-value">${current:,.0f}</div><div class="metric-label">Bankroll</div><div style="font-size:0.7rem;color:#ef4444;">▼ {drawdown:.1f}% from peak</div></div>', unsafe_allow_html=True)
     
@@ -226,8 +209,9 @@ def show_dashboard():
         st.markdown(f'<div class="metric-card"><div class="metric-value">${staked:,.0f}</div><div class="metric-label">Total Staked</div><div style="font-size:0.7rem;color:#10b981;">▲ ${potential:,.0f} potential</div></div>', unsafe_allow_html=True)
     
     with m4:
-        grade = perf.get("system_health", {}).get("grade", "B") or "B"
-        accuracy = perf.get("system_health", {}).get("accuracy", 0.58) or 0.58
+        health = data.get("system_health", {})
+        grade = health.get("grade", "B")
+        accuracy = health.get("accuracy", 0.58)
         st.markdown(f'<div class="metric-card"><div class="metric-value">Grade {grade}</div><div class="metric-label">System Health</div><div style="font-size:0.7rem;">{accuracy:.0%} accuracy</div></div>', unsafe_allow_html=True)
     
     st.divider()
@@ -303,7 +287,7 @@ def show_dashboard():
     
     # Bankroll Chart
     st.markdown("### 📉 Bankroll History")
-    history = bankroll.get("bankroll_history", MOCK_DATA["bankroll_history"])
+    history = data.get("bankroll_history", MOCK_DATA["bankroll_history"])
     df = pd.DataFrame(history)
     fig = px.line(df, x="date", y="bankroll", markers=True, line_shape="spline")
     fig.update_layout(plot_bgcolor="#1e293b", paper_bgcolor="#1e293b", font_color="white", height=350)
@@ -434,7 +418,6 @@ def show_calendar():
             time.sleep(1)
             st.success(f"Scan complete for {date}")
             st.cache_data.clear()
-            load_data()
             st.rerun()
     
     st.markdown("### 📊 Recent Activity")
@@ -482,8 +465,8 @@ def main():
         
         st.divider()
         
-        perf = st.session_state.get("performance_data", MOCK_DATA)
-        health = perf.get("system_health", {})
+        # Performance metrics in sidebar - FIXED
+        health = MOCK_DATA.get("system_health", {})
         st.metric("Overall Accuracy", f"{health.get('accuracy', 0.58):.0%}")
         st.metric("HIGH Confidence", "68%")
         st.metric("MEDIUM Confidence", "52%")
@@ -492,6 +475,7 @@ def main():
         st.caption(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         st.caption("🎯 Match Oracle")
     
+    # Page routing
     page = st.session_state.page
     if page == "dashboard":
         show_dashboard()
