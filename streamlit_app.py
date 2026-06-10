@@ -157,21 +157,8 @@ all_legs_data = {
 }
 all_legs_df = pd.DataFrame(all_legs_data)
 
-# Color status column
-def color_status(val):
-    if "APPROVED" in val:
-        return "background-color: #10b98120; color: #10b981"
-    elif "CAUTION" in val:
-        return "background-color: #f59e0b20; color: #f59e0b"
-    elif "REJECTED" in val:
-        return "background-color: #ef444420; color: #ef4444"
-    return ""
-
-st.dataframe(
-    all_legs_df.style.applymap(color_status, subset=["Status"]),
-    use_container_width=True,
-    hide_index=True
-)
+# Display the dataframe without styling (simpler to avoid errors)
+st.dataframe(all_legs_df, use_container_width=True, hide_index=True)
 
 st.divider()
 
@@ -207,6 +194,31 @@ with st.sidebar:
     st.metric("Current", "$12,450", "-$750")
     st.metric("Peak", "$13,200", "")
     st.metric("Drawdown", "5.7%", "↓")
+    
+    st.divider()
+    
+    # Apply filters (simple version)
+    if status_filter or league_filter:
+        st.subheader("📊 Filtered Results")
+        filtered_df = all_legs_df.copy()
+        
+        if status_filter:
+            # Convert status values for filtering
+            status_map = {
+                "APPROVED": "✅ APPROVED",
+                "CAUTION": "⚠️ CAUTION", 
+                "REJECTED": "❌ REJECTED"
+            }
+            filter_values = [status_map[s] for s in status_filter]
+            filtered_df = filtered_df[filtered_df["Status"].isin(filter_values)]
+        
+        if league_filter:
+            filtered_df = filtered_df[filtered_df["League"].isin(league_filter)]
+        
+        if not filtered_df.empty:
+            st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No matches match the selected filters")
     
     st.divider()
     
