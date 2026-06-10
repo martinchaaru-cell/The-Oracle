@@ -89,29 +89,36 @@ st.markdown("""
         border-radius: 20px;
         font-size: 0.7rem;
     }
-    .status-bar {
+    /* Status bar - positioned in sidebar area to avoid overlap */
+    .status-container {
         position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        bottom: 10px;
+        left: 80px;
+        right: 20px;
         background-color: #1e293b;
-        padding: 0.5rem 1rem;
+        padding: 8px 16px;
+        border-radius: 8px;
         font-size: 0.7rem;
         color: #94a3b8;
-        border-top: 1px solid #334155;
-        z-index: 999;
+        border: 1px solid #334155;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        z-index: 100;
+        margin-left: 260px; /* Account for sidebar width */
     }
     @keyframes pulse {
         0% { opacity: 1; }
         50% { opacity: 0.5; }
         100% { opacity: 1; }
     }
-    /* Add padding to bottom of main content to prevent overlap with status bar */
+    /* Add padding to bottom of main content */
     .main-content {
-        padding-bottom: 50px;
+        padding-bottom: 60px;
+    }
+    /* Ensure main content doesn't overlap */
+    .block-container {
+        padding-bottom: 3rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -217,28 +224,33 @@ def navigate_to(page, leg=None):
 
 # ========== STATUS BAR COMPONENT ==========
 def show_status_bar():
-    """Display status bar at bottom of page"""
+    """Display status bar at bottom of sidebar area to avoid overlap"""
     source_text = "🔴 LIVE" if st.session_state.data_source == "api-football" else "📊 DEMO"
     source_class = "live-badge" if st.session_state.data_source == "api-football" else "demo-badge"
     backend_status_text = "✅ Backend OK" if st.session_state.backend_status == "connected" else "⚠️ Backend Offline"
     current_time = format_time(get_current_time())
     
+    # Status bar in sidebar area (not overlapping with Streamlit's manage app button)
+    with st.sidebar:
+        st.divider()
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.caption(f"📡 {st.session_state.data_source.upper()}")
+        with col2:
+            st.caption(f"🕐 {get_current_time().strftime('%H:%M:%S')}")
+        st.caption(f"🔌 {backend_status_text}")
+        st.caption(f"🎯 Match Oracle v3.0")
+    
+    # Also show compact version in main area footer
     st.markdown(f"""
-    <div class="status-bar">
-        <div>
-            <span class="{source_class}">{source_text}</span>
-            <span style="margin-left: 1rem;">{backend_status_text}</span>
-        </div>
-        <div>
-            <span>🕐 {current_time} (GMT+3)</span>
-            <span style="margin-left: 1rem; cursor: pointer;" onclick="location.reload()">🔄 Refresh</span>
-        </div>
+    <div style="position: fixed; bottom: 5px; right: 10px; background-color: #1e293b; padding: 4px 12px; border-radius: 20px; font-size: 0.65rem; color: #64748b; z-index: 1000;">
+        {get_current_time().strftime('%H:%M:%S')} GMT+3 | {st.session_state.data_source.upper()}
     </div>
     """, unsafe_allow_html=True)
 
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
-    # Main content wrapper with padding for status bar
     st.markdown('<div class="main-content">', unsafe_allow_html=True)
     
     st.markdown('<p class="main-header">🎯 MATCH ORACLE</p>', unsafe_allow_html=True)
@@ -285,10 +297,12 @@ def show_dashboard():
     st.divider()
     
     # Fetch live data button
-    if st.button("📡 Fetch Live Fixtures", use_container_width=True):
-        with st.spinner("Fetching from API-Football..."):
-            st.session_state.live_fixtures = fetch_live_fixtures()
-            st.rerun()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("📡 Fetch Live Fixtures", use_container_width=True):
+            with st.spinner("Fetching from API-Football..."):
+                st.session_state.live_fixtures = fetch_live_fixtures()
+                st.rerun()
     
     # 3-Column Layout
     c1, c2, c3 = st.columns(3)
@@ -516,11 +530,6 @@ def main():
             else:
                 st.session_state.live_fixtures = MOCK_FIXTURES
             st.rerun()
-        
-        st.divider()
-        
-        st.caption(f"🎯 Match Oracle v3.0")
-        st.caption(f"📡 Source: {st.session_state.data_source.upper()}")
     
     # Page routing
     page = st.session_state.page
@@ -535,7 +544,7 @@ def main():
     elif page == "settings":
         show_settings()
     
-    # Status bar at bottom (shown on all pages)
+    # Status bar (now in sidebar + compact footer)
     show_status_bar()
 
 if __name__ == "__main__":
