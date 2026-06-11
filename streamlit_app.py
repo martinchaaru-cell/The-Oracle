@@ -27,16 +27,17 @@ st.markdown("""
     }
     
     .gold-header {
-        font-size: 1.8rem;
+        font-size: 2rem;
         font-weight: bold;
         color: #FFD700;
         margin-bottom: 0;
+        margin-top: -10px;
     }
     
     .gold-subheader {
         font-size: 0.9rem;
-        color: #888;
-        margin-bottom: 1rem;
+        color: #B8860B;
+        margin-bottom: 1.5rem;
     }
     
     .module-header {
@@ -185,6 +186,20 @@ st.markdown("""
         padding: 10px;
     }
     
+    .dashboard-card {
+        background: #1a1a1a;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid #FFD70030;
+        transition: all 0.3s;
+    }
+    
+    .dashboard-card:hover {
+        border-color: #FFD700;
+        transform: translateY(-2px);
+    }
+    
     .verdict-pass { color: #00FF88; font-weight: bold; }
     .verdict-fail { color: #FF4444; font-weight: bold; }
     .verdict-warn { color: #FFA500; font-weight: bold; }
@@ -221,24 +236,87 @@ FORENSIC_DATA = {
     "final_stake": 0.00,
     "final_reason": "H2H conflict between historical dominance (Derry) and current form (Bohemians)",
     
-    "m0_checks": [{"check": "Fixture Status", "value": "NS (upcoming)", "result": "PASS"}],
-    "m0_hard_filters": [{"filter": "Senior Men's League", "result": "PASS"}],
+    "m0_checks": [
+        {"check": "Fixture Status", "value": "NS (upcoming)", "result": "PASS"},
+        {"check": "Odds present", "value": "2.90/3.20/2.36", "result": "PASS"},
+        {"check": "Odds bounds", "value": "All >1.01, <100", "result": "PASS"},
+    ],
+    "m0_hard_filters": [
+        {"filter": "Senior Men's League", "result": "PASS"},
+        {"filter": "League Tier", "result": "PASS (Ireland Tier 1)"},
+        {"filter": "Maturity (≥10 games)", "result": "PASS (20 games each)"},
+    ],
     
-    "m1_home_metrics": {"games": 20, "wins": 4, "draws": 10, "losses": 6, "goals_for": 22, "goals_against": 23, "home_record": "3-5-2", "home_wr": 30, "recent_form": "L, D, D, D, L, L", "ppg": 1.10},
-    "m1_away_metrics": {"games": 20, "wins": 9, "draws": 7, "losses": 4, "goals_for": 31, "goals_against": 21, "away_record": "6-2-2", "away_wr": 60, "recent_form": "W, L, W, D, W, W", "ppg": 1.70},
-    "m1_h2h": {"all_time": "Derry 46% vs Bohemians 24%", "insight": "Historical dominance vs current form conflict"},
+    "m1_home_metrics": {
+        "games": 20, "wins": 4, "draws": 10, "losses": 6,
+        "goals_for": 22, "goals_against": 23,
+        "home_record": "3-5-2", "home_wr": 30,
+        "recent_form": "L, D, D, D, L, L",
+        "ppg": 1.10, "clean_sheets": 5
+    },
+    "m1_away_metrics": {
+        "games": 20, "wins": 9, "draws": 7, "losses": 4,
+        "goals_for": 31, "goals_against": 21,
+        "away_record": "6-2-2", "away_wr": 60,
+        "recent_form": "W, L, W, D, W, W",
+        "ppg": 1.70, "clean_sheets": 7
+    },
+    "m1_h2h": {
+        "all_time": "Derry 46% (37), Draw 30% (24), Bohemians 24% (19)",
+        "last_10": "Derry 4, Draw 3, Bohemians 3",
+        "last_6": "Derry 2, Draw 3, Bohemians 1",
+        "insight": "Derry City has HISTORICAL dominance but recent H2H is balanced"
+    },
     
-    "m3_odds_analysis": {"home_odds": 2.90, "away_odds": 2.36, "edge": -2.4},
+    "m3_odds_analysis": {
+        "home_odds": 2.90, "home_implied": 34.5, "home_model": 30,
+        "draw_odds": 3.20, "draw_implied": 31.3, "draw_model": 30,
+        "away_odds": 2.36, "away_implied": 42.4, "away_model": 40,
+        "margin": 8.2, "edge": -2.4
+    },
+    
+    "m4_checks": [
+        {"check": "C1: Season Win Gap", "passed": True, "value": "+5 wins", "points": 10},
+        {"check": "C2: Venue Win Gap", "passed": True, "value": "+30%", "points": 10},
+        {"check": "C3: H2H Favoured", "passed": False, "value": "24%", "points": 0},
+        {"check": "C4: Transition Favours", "passed": True, "value": "~50%", "points": 8},
+    ],
     "m4_passed": 7, "m4_total": 8,
+    
+    "m5_failures": [
+        {"name": "Low Season Win Count (Derry)", "points": 0.5},
+        {"name": "Low Home Wins at Venue (Derry)", "points": 1.0},
+    ],
     "m5_total": 2.5, "m5_threshold": 4.5,
-    "m6_injuries": [{"team": "Bohemians FC", "player": "B. Maher", "position": "G", "status": "OUT"}],
+    
+    "m6_injuries": [
+        {"team": "Derry City", "player": "P. McClean", "position": "D", "status": "OUT"},
+        {"team": "Bohemians FC", "player": "B. Maher", "position": "G", "status": "OUT"},
+    ],
+    "m6_scores": {"Derry City": 55, "Bohemians FC": 45},
+    
+    "m7_ai": [
+        {"provider": "DeepSeek", "verdict": "CAUTION", "reasoning": "Form strong but H2H favours Derry"},
+        {"provider": "Claude", "verdict": "CAUTION", "reasoning": "Missing GK is concern"},
+        {"provider": "Gemini", "verdict": "APPROVE", "reasoning": "League position dominant"},
+        {"provider": "GPT", "verdict": "REJECT", "reasoning": "H2H conflict"},
+    ],
     "m7_consensus": "CAUTION", "m7_agreement": 25,
-    "m8_severity": "HIGH", "m8_verdict": "HARD REJECT",
+    
+    "m8_h2h_all_time": {"derry": 46, "bohemians": 24},
+    "m8_h2h_last6": {"derry": 33, "bohemians": 17},
+    "m8_current_season": {"derry": 20, "bohemians": 45},
+    "m8_severity": "HIGH",
+    "m8_verdict": "HARD REJECT",
+    
+    "m9_underdog_edge": -5,
     "m9_threat_level": "LOW",
-    "m10_confidence": "LOW"
+    
+    "m10_bilateral": {"home": 28, "draw": 32, "away": 40},
+    "m10_confidence": "LOW",
 }
 
-# ========== LEAGUE DATA (for League Analysis page) ==========
+# ========== LEAGUE DATA ==========
 LEAGUE_DATA = {
     "home": "Shabab (KUW)",
     "away": "Jahra FC",
@@ -288,21 +366,21 @@ LEAGUE_DATA = {
     ],
     
     "home_matches": [
-        {"date": "29/05/2026", "opponent": "Tadamon (KUW)", "score": "0-2", "result": "L"},
-        {"date": "15/05/2026", "opponent": "Kazma SC", "score": "0-2", "result": "L"},
-        {"date": "05/02/2026", "opponent": "Fahaheel SC", "score": "1-1", "result": "D"},
-        {"date": "07/01/2026", "opponent": "Qadisiya Kuwait", "score": "0-2", "result": "L"},
-        {"date": "02/01/2026", "opponent": "Al Arabi Kuwait", "score": "0-5", "result": "L"},
+        {"date": "29/05/2026", "opponent": "Tadamon (KUW)", "score": "0-2"},
+        {"date": "15/05/2026", "opponent": "Kazma SC", "score": "0-2"},
+        {"date": "05/02/2026", "opponent": "Fahaheel SC", "score": "1-1"},
+        {"date": "07/01/2026", "opponent": "Qadisiya Kuwait", "score": "0-2"},
+        {"date": "02/01/2026", "opponent": "Al Arabi Kuwait", "score": "0-5"},
     ],
     
     "home_stats": {"wins": 1, "draws": 3, "losses": 5, "win_pct": 11, "draw_pct": 33, "loss_pct": 56},
     
     "away_matches": [
-        {"date": "29/05/2026", "opponent": "Qadisiya Kuwait", "score": "0-3", "result": "L"},
-        {"date": "24/02/2026", "opponent": "Tadamon (KUW)", "score": "1-4", "result": "L"},
-        {"date": "13/02/2026", "opponent": "Tadamon (KUW)", "score": "0-0", "result": "D"},
-        {"date": "25/01/2026", "opponent": "Kazma SC", "score": "1-2", "result": "L"},
-        {"date": "14/01/2026", "opponent": "Kuwait SC", "score": "0-2", "result": "L"},
+        {"date": "29/05/2026", "opponent": "Qadisiya Kuwait", "score": "0-3"},
+        {"date": "24/02/2026", "opponent": "Tadamon (KUW)", "score": "1-4"},
+        {"date": "13/02/2026", "opponent": "Tadamon (KUW)", "score": "0-0"},
+        {"date": "25/01/2026", "opponent": "Kazma SC", "score": "1-2"},
+        {"date": "14/01/2026", "opponent": "Kuwait SC", "score": "0-2"},
     ],
     
     "away_stats": {"wins": 1, "draws": 1, "losses": 9, "win_pct": 9, "draw_pct": 9, "loss_pct": 82},
@@ -323,9 +401,6 @@ if "page" not in st.session_state:
 def navigate_to(page):
     st.session_state.page = page
     st.rerun()
-
-def go_back():
-    navigate_to("dashboard")
 
 # ========== SIDEBAR NAVIGATION ==========
 with st.sidebar:
@@ -355,53 +430,39 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Version:** 2.0.0")
 
-# ========== DASHBOARD PAGE ==========
+# ========== DASHBOARD PAGE (CLEAN & MINIMAL) ==========
 def show_dashboard():
     d = FORENSIC_DATA
     
     st.markdown('<p class="gold-header">🎯 Match Oracle Dashboard</p>', unsafe_allow_html=True)
     st.markdown('<p class="gold-subheader">Forensic Betting Intelligence | AI-Powered Match Analysis</p>', unsafe_allow_html=True)
     
-    # Key Metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Active Matches", "3", delta="+2")
-    with col2:
-        st.metric("Approval Rate", "33%", delta="+5%")
-    with col3:
-        st.metric("AI Confidence", "MEDIUM", delta="Stable")
-    with col4:
-        st.metric("Total Value", "€0.00", delta="No active bets")
-    
-    st.divider()
-    
-    # Featured Match
+    # Featured Match Card
     st.markdown("### 🔥 Featured Match")
     
-    col_left, col_center, col_right = st.columns([2, 1, 2])
+    col1, col2, col3 = st.columns([2, 1, 2])
     
-    with col_left:
-        st.markdown(f"**🏠 {d['home']}**")
+    with col1:
+        st.markdown(f"### 🏠 {d['home']}")
         st.metric("League Position", "8th", delta="-2")
         st.metric("PPG", d['m1_home_metrics']['ppg'])
         st.metric("Recent Form", d['m1_home_metrics']['recent_form'])
+        st.metric("Odds", d['home_odds'])
     
-    with col_center:
-        st.markdown("<br>", unsafe_allow_html=True)
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("### VS")
         st.markdown("---")
-        st.markdown("**Odds**")
-        st.markdown(f"🏠 **{d['home_odds']}**")
-        st.markdown(f"🤝 **{d['draw_odds']}**")
-        st.markdown(f"✈️ **{d['away_odds']}**")
+        st.markdown(f"**Draw Odds:** {d['draw_odds']}")
         st.markdown("---")
         st.error(f"**Verdict:** {d['final_verdict']}")
     
-    with col_right:
-        st.markdown(f"**✈️ {d['away']}**")
+    with col3:
+        st.markdown(f"### ✈️ {d['away']}")
         st.metric("League Position", "2nd", delta="+5")
         st.metric("PPG", d['m1_away_metrics']['ppg'])
         st.metric("Recent Form", d['m1_away_metrics']['recent_form'])
+        st.metric("Odds", d['away_odds'])
     
     st.divider()
     
@@ -418,25 +479,56 @@ def show_dashboard():
     
     st.divider()
     
-    # Quick Links
+    # Quick Navigation Cards
     st.markdown("### Quick Navigation")
+    
     col1, col2 = st.columns(2)
+    
     with col1:
-        if st.button("🔬 View Forensic Report", use_container_width=True):
-            navigate_to("forensic_report")
+        with st.container():
+            st.markdown("""
+            <div class="dashboard-card">
+                <h3>🔬 Forensic Report</h3>
+                <p>10-module verification system including:</p>
+                <ul style="text-align: left;">
+                    <li>Data Integrity (M0)</li>
+                    <li>Probability Engine (M3)</li>
+                    <li>Asymmetric Pre-filter (M4)</li>
+                    <li>Quad-AI Intelligence (M7)</li>
+                    <li>Dual Pattern Engine (M8)</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("View Forensic Report →", key="forensic_btn", use_container_width=True):
+                navigate_to("forensic_report")
+    
     with col2:
-        if st.button("📋 View League Analysis", use_container_width=True):
-            navigate_to("league_analysis")
+        with st.container():
+            st.markdown("""
+            <div class="dashboard-card">
+                <h3>📋 League Analysis</h3>
+                <p>Comprehensive match statistics including:</p>
+                <ul style="text-align: left;">
+                    <li>League Standings</li>
+                    <li>Last 6 Matches</li>
+                    <li>Home/Away Splits</li>
+                    <li>Head-to-Head History</li>
+                    <li>Win Probabilities</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("View League Analysis →", key="league_btn", use_container_width=True):
+                navigate_to("league_analysis")
 
 # ========== FORENSIC REPORT PAGE ==========
 def show_forensic_report():
     d = FORENSIC_DATA
     
     st.markdown(f'<p class="gold-header">🔬 Forensic Report: {d["home"]} vs {d["away"]}</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="gold-subheader">{d["league"]} | {d["venue"]} | {d["date"]}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="gold-subheader">{d["league"]} | {d["venue"]} | {d["date"]} | Odds: H {d["home_odds"]} | D {d["draw_odds"]} | A {d["away_odds"]}</p>', unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
-        go_back()
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -444,6 +536,8 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 0: GUARDRAIL & DATA INTEGRITY</p>', unsafe_allow_html=True)
     for check in d["m0_checks"]:
         st.markdown(f"✅ {check['check']}: {check['value']}")
+    for f in d["m0_hard_filters"]:
+        st.markdown(f"✅ {f['filter']}: {f['result']}")
     st.success("**M0 Verdict:** ✅ PASS")
     st.divider()
     
@@ -453,26 +547,38 @@ def show_forensic_report():
     with col1:
         st.markdown(f"**{d['home']}**")
         st.markdown(f"Games: {d['m1_home_metrics']['games']} | W-D-L: {d['m1_home_metrics']['wins']}-{d['m1_home_metrics']['draws']}-{d['m1_home_metrics']['losses']}")
+        st.markdown(f"Goals: {d['m1_home_metrics']['goals_for']}/{d['m1_home_metrics']['goals_against']}")
         st.markdown(f"PPG: {d['m1_home_metrics']['ppg']}")
     with col2:
         st.markdown(f"**{d['away']}**")
         st.markdown(f"Games: {d['m1_away_metrics']['games']} | W-D-L: {d['m1_away_metrics']['wins']}-{d['m1_away_metrics']['draws']}-{d['m1_away_metrics']['losses']}")
+        st.markdown(f"Goals: {d['m1_away_metrics']['goals_for']}/{d['m1_away_metrics']['goals_against']}")
         st.markdown(f"PPG: {d['m1_away_metrics']['ppg']}")
+    st.markdown(f"**H2H:** {d['m1_h2h']['insight']}")
     st.success("**M1 Verdict:** ✅ PASS")
     st.divider()
     
     # Module 3
     st.markdown('<p class="module-header">MODULE 3: PROBABILITY ENGINE</p>', unsafe_allow_html=True)
-    st.warning(f"**Edge: {d['m3_odds_analysis']['edge']:+}% (NEGATIVE)**")
+    mo = d["m3_odds_analysis"]
+    st.markdown(f"Home: {mo['home_odds']} (Implied {mo['home_implied']}% | Model {mo['home_model']}%)")
+    st.markdown(f"Draw: {mo['draw_odds']} (Implied {mo['draw_implied']}% | Model {mo['draw_model']}%)")
+    st.markdown(f"Away: {mo['away_odds']} (Implied {mo['away_implied']}% | Model {mo['away_model']}%)")
+    st.warning(f"**Edge: {mo['edge']:+}% (NEGATIVE)**")
     st.divider()
     
     # Module 4
     st.markdown('<p class="module-header">MODULE 4: ASYMMETRIC PRE-FILTER</p>', unsafe_allow_html=True)
+    for c in d["m4_checks"]:
+        status = "✅" if c["passed"] else "❌"
+        st.markdown(f"{status} {c['check']}: {c['value']} (+{c['points']} pts)")
     st.success(f"**Passed:** {d['m4_passed']}/{d['m4_total']} → ✅ PASS")
     st.divider()
     
     # Module 5
     st.markdown('<p class="module-header">MODULE 5: FORENSIC CHECKS</p>', unsafe_allow_html=True)
+    for f in d["m5_failures"]:
+        st.markdown(f"⚠️ {f['name']}: +{f['points']} pts")
     st.success(f"**TOTAL:** {d['m5_total']} / {d['m5_threshold']} → ✅ PASS")
     st.divider()
     
@@ -480,40 +586,46 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 6: PERSONNEL FORENSICS</p>', unsafe_allow_html=True)
     for inj in d["m6_injuries"]:
         st.markdown(f"⚠️ {inj['team']}: {inj['player']} ({inj['position']}) - {inj['status']}")
+    st.markdown(f"**Personnel Scores:** {d['home']}: {d['m6_scores']['Derry City']}/100 | {d['away']}: {d['m6_scores']['Bohemians FC']}/100")
     st.divider()
     
     # Module 7
     st.markdown('<p class="module-header">MODULE 7: QUAD-AI INTELLIGENCE</p>', unsafe_allow_html=True)
+    for ai in d["m7_ai"]:
+        st.markdown(f"**{ai['provider']}:** {ai['verdict']} - {ai['reasoning']}")
     st.info(f"**Consensus:** {d['m7_consensus']} (Agreement: {d['m7_agreement']}%)")
     st.divider()
     
     # Module 8
     st.markdown('<p class="module-header">MODULE 8: DUAL PATTERN ENGINE</p>', unsafe_allow_html=True)
+    st.markdown(f"H2H all-time: {d['home']} DOMINANT ({d['m8_h2h_all_time']['derry']}% vs {d['m8_h2h_all_time']['bohemians']}%)")
+    st.markdown(f"Current season: {d['away']} DOMINANT ({d['m8_current_season']['bohemians']}% vs {d['m8_current_season']['derry']}%)")
     st.error(f"**Conflict severity:** {d['m8_severity']}")
     st.error(f"**M8 Verdict:** 🚨 {d['m8_verdict']}")
     st.divider()
     
     # Module 9
     st.markdown('<p class="module-header">MODULE 9: UNDERDOG SCANNER</p>', unsafe_allow_html=True)
-    st.info(f"**Threat Level:** {d['m9_threat_level']}")
+    st.markdown(f"Underdog Edge: {d['m9_underdog_edge']:+}%")
+    st.markdown(f"Threat Level: {d['m9_threat_level']}")
     st.divider()
     
     # Module 10
     st.markdown('<p class="module-header">MODULE 10: SEASON TALLY MATRIX</p>', unsafe_allow_html=True)
+    st.markdown(f"Home Win: {d['m10_bilateral']['home']}% | Draw: {d['m10_bilateral']['draw']}% | Away: {d['m10_bilateral']['away']}%")
     st.info(f"**Confidence:** {d['m10_confidence']}")
     st.divider()
     
     # Final Verdict
     st.markdown('<p class="module-header">FINAL VERDICT</p>', unsafe_allow_html=True)
     st.error(f"**Verdict:** {d['final_verdict']}")
-    st.warning(f"**Stake:** €{d['final_stake']}")
-    st.info(f"**Reason:** {d['final_reason']}")
+    st.warning(f"**Recommended Stake:** €{d['final_stake']}")
+    st.info(f"**Reasoning:** {d['final_reason']}")
 
-# ========== LEAGUE ANALYSIS PAGE (Forebet Style) ==========
+# ========== LEAGUE ANALYSIS PAGE ==========
 def show_league_analysis():
     d = LEAGUE_DATA
     
-    # Match Header
     st.markdown(f"""
     <div class="match-header">
         <div class="match-title">{d['home']} VS {d['away']}</div>
@@ -523,21 +635,18 @@ def show_league_analysis():
     """, unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
-        go_back()
+        navigate_to("dashboard")
     
     st.divider()
     
-    # Main content area
     col_left, col_right = st.columns([2, 1])
     
     with col_left:
-        # Win Probability Section
         st.markdown(f'<div class="section-header">Win Probability</div>', unsafe_allow_html=True)
-        st.markdown(f"**{d['home']}** {d['home_win_prob']}%")
         
         st.markdown(f"""
         <div class="prob-bar-container">
-            <div class="prob-bar-home" style="width: {d['home_win_prob']}%">{d['home_win_prob']}%</div>
+            <div class="prob-bar-home" style="width: {d['home_win_prob']}%">{d['home']} {d['home_win_prob']}%</div>
         </div>
         <div class="prob-bar-container">
             <div class="prob-bar-draw" style="width: {d['draw_prob']}%">Draw {d['draw_prob']}%</div>
@@ -555,69 +664,55 @@ def show_league_analysis():
         </div>
         """, unsafe_allow_html=True)
         
-        # Tabs for detailed stats
         tab1, tab2, tab3, tab4, tab5 = st.tabs(["Standings", "Last 6", "Home/Away", "H2H", "Match Intro"])
         
         with tab1:
-            st.markdown("### STANDINGS OF BOTH TEAMS")
             standings_df = pd.DataFrame(d['standings'])
             st.dataframe(standings_df, use_container_width=True, hide_index=True)
-            st.caption("🏆 Championship Group | ⬇️ Relegation Group")
         
         with tab2:
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown(f"### {d['home']} - LAST 6 MATCHES")
+                st.markdown(f"### {d['home']}")
                 for match in d['home_last_6']:
                     away_indicator = "✈️ " if match.get('away') else "🏠 "
-                    st.markdown(f"{match['date']} | {away_indicator}{match['opponent']} | {match['score']} | {match['result']}")
-            
+                    st.markdown(f"{match['date']} | {away_indicator}{match['opponent']} | {match['score']}")
             with col2:
-                st.markdown(f"### {d['away']} - LAST 6 MATCHES")
+                st.markdown(f"### {d['away']}")
                 for match in d['away_last_6']:
                     away_indicator = "✈️ " if match.get('away') else "🏠 "
-                    st.markdown(f"{match['date']} | {away_indicator}{match['opponent']} | {match['score']} | {match['result']}")
+                    st.markdown(f"{match['date']} | {away_indicator}{match['opponent']} | {match['score']}")
         
         with tab3:
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown(f"### {d['home']} - HOME MATCHES")
-                st.markdown(f"**Win {d['home_stats']['win_pct']}% | Draw {d['home_stats']['draw_pct']}% | Lost {d['home_stats']['loss_pct']}%**")
+                st.markdown(f"### {d['home']} - HOME")
+                st.markdown(f"W {d['home_stats']['win_pct']}% | D {d['home_stats']['draw_pct']}% | L {d['home_stats']['loss_pct']}%")
                 for match in d['home_matches']:
                     st.markdown(f"{match['date']} | {match['opponent']} | {match['score']}")
-            
             with col2:
-                st.markdown(f"### {d['away']} - AWAY MATCHES")
-                st.markdown(f"**Win {d['away_stats']['win_pct']}% | Draw {d['away_stats']['draw_pct']}% | Lost {d['away_stats']['loss_pct']}%**")
+                st.markdown(f"### {d['away']} - AWAY")
+                st.markdown(f"W {d['away_stats']['win_pct']}% | D {d['away_stats']['draw_pct']}% | L {d['away_stats']['loss_pct']}%")
                 for match in d['away_matches']:
                     st.markdown(f"{match['date']} | {match['opponent']} | {match['score']}")
         
         with tab4:
-            st.markdown("### HEAD TO HEAD")
             for match in d['h2h']:
                 st.markdown(f"{match['date']} | {match['home']} vs {match['away']} | {match['score']}")
         
         with tab5:
-            st.markdown("### MATCH INTRO")
             st.markdown(f"""
             **{d['home']}** and **{d['away']}** face off in the {d['league']} at {d['venue']} on {d['date']}.
             
-            Heading into this meeting, {d['home']} holds 9th place in the standings with 15 points, 
-            while {d['away']} sits just behind in 10th with 8 points.
+            {d['home']} holds 9th place with 15 points, while {d['away']} sits in 10th with 8 points.
             
-            Recent form has been concerning for both sides, as {d['home']} has lost in 67% of their 
-            last 6 home matches, and {d['away']} has suffered defeat in 82% of their previous away outings.
-            
-            The recent head-to-head history gives {d['home']} the upper hand, having secured 4 wins 
-            in the last 5 matches against {d['away']}.
+            Recent form: {d['home']} has lost 67% of home matches, {d['away']} has lost 82% of away matches.
             
             **Prediction:** {d['home']} to win {d['correct_score']}.
             """)
     
     with col_right:
-        # Odds Section
         st.markdown("### 1x2")
-        
         st.markdown(f"""
         <div class="odds-button">
             <div class="stat-label">🏠 {d['home']}</div>
@@ -636,31 +731,17 @@ def show_league_analysis():
         """, unsafe_allow_html=True)
         
         st.divider()
-        
-        st.markdown("### Match Information")
+        st.markdown("### Match Info")
         st.markdown(f"**Round 18, Regular Season**")
         st.markdown(f"**League:** {d['league']}")
         st.markdown(f"**Venue:** {d['venue']}")
-        st.markdown(f"**Temperature:** {d['temperature']}")
-        
-        st.divider()
-        
-        st.markdown("### Featured match")
-        st.markdown("**Saint Eloi Lupopo** vs **CS Don Bosco**")
-        st.caption("🇨🇩 11/06/2026 16:00")
-        
-        st.divider()
-        
-        st.markdown("### Pick of the day")
-        st.markdown("**Brazos Valley** vs **San Antonio FC**")
-        st.caption("🇺🇸 12/06/2026 04:00")
 
 # ========== PERFORMANCE PAGE ==========
 def show_performance():
     st.markdown('<p class="gold-header">📈 Performance Analytics</p>', unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
-        go_back()
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -688,12 +769,12 @@ def show_settings():
     st.markdown('<p class="gold-header">⚙️ Settings</p>', unsafe_allow_html=True)
     
     if st.button("← Back to Dashboard"):
-        go_back()
+        navigate_to("dashboard")
     
     st.divider()
     
     st.markdown("### AI Settings")
-    st.slider("AI Consensus Threshold", 0, 100, 60)
+    ai_threshold = st.slider("AI Consensus Threshold", 0, 100, 60)
     st.checkbox("Enable DeepSeek", True)
     st.checkbox("Enable Claude", True)
     st.checkbox("Enable Gemini", True)
@@ -706,7 +787,7 @@ def show_settings():
     st.number_input("Max Stake (€)", 0.0, 10000.0, 100.0)
     
     if st.button("Save Settings"):
-        st.success("Saved!")
+        st.success("Settings saved!")
 
 # ========== MAIN ROUTING ==========
 if st.session_state.page == "dashboard":
