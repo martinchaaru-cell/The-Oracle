@@ -232,6 +232,62 @@ def navigate_to(page, match=None):
 def go_back():
     navigate_to("dashboard")
 
+# ========== DASHBOARD PAGE ==========
+def show_dashboard():
+    st.markdown('<p class="gold-header">🎯 Match Oracle</p>', unsafe_allow_html=True)
+    st.markdown('<p class="gold-subheader">Forensic Betting Intelligence | AI-Powered Match Analysis</p>', unsafe_allow_html=True)
+    
+    # Welcome message
+    st.markdown("""
+    ### Welcome to Match Oracle
+    
+    This system provides **forensic-level analysis** for football matches using:
+    - 10-module verification system
+    - Quad-AI consensus intelligence
+    - Dual-pattern conflict detection
+    - Asymmetric pre-filtering
+    
+    **How to use:** Click "View Forensic Report" below to see the complete analysis.
+    """)
+    
+    # Match card
+    with st.container():
+        st.markdown("---")
+        col1, col2, col3, col4 = st.columns([2, 1, 2, 1])
+        
+        with col1:
+            st.markdown(f"### 🏠 {FORENSIC_DATA['home']}")
+            st.markdown(f"**Record:** {FORENSIC_DATA['m1_home_metrics']['wins']}-{FORENSIC_DATA['m1_home_metrics']['draws']}-{FORENSIC_DATA['m1_home_metrics']['losses']}")
+            st.markdown(f"**PPG:** {FORENSIC_DATA['m1_home_metrics']['ppg']}")
+        
+        with col2:
+            st.markdown("### VS")
+            st.markdown(f"**Odds:** {FORENSIC_DATA['home_odds']}")
+        
+        with col3:
+            st.markdown(f"### ✈️ {FORENSIC_DATA['away']}")
+            st.markdown(f"**Record:** {FORENSIC_DATA['m1_away_metrics']['wins']}-{FORENSIC_DATA['m1_away_metrics']['draws']}-{FORENSIC_DATA['m1_away_metrics']['losses']}")
+            st.markdown(f"**PPG:** {FORENSIC_DATA['m1_away_metrics']['ppg']}")
+        
+        with col4:
+            st.markdown(f"**Odds:** {FORENSIC_DATA['away_odds']}")
+            st.markdown(f"**Draw:** {FORENSIC_DATA['draw_odds']}")
+        
+        st.markdown("---")
+        
+        # Verdict banner
+        verdict = FORENSIC_DATA['final_verdict']
+        if "REJECTED" in verdict:
+            st.error(f"🚨 **FINAL VERDICT: {verdict}**")
+            st.warning(f"**Reason:** {FORENSIC_DATA['final_reason']}")
+            st.info(f"**Recommended Stake:** €{FORENSIC_DATA['final_stake']}")
+        else:
+            st.success(f"✅ **FINAL VERDICT: {verdict}**")
+        
+        # View report button
+        if st.button("🔬 View Forensic Report", use_container_width=True):
+            navigate_to("forensic_report")
+
 # ========== COMPLETE FORENSIC REPORT PAGE ==========
 def show_forensic_report():
     d = FORENSIC_DATA
@@ -251,14 +307,14 @@ def show_forensic_report():
     st.markdown("**Raw Data Validation**")
     for check in d["m0_checks"]:
         status = "✅ PASS" if check["result"] == "PASS" else "❌ FAIL"
-        st.markdown(f"| {check['check']} | {check['value']} | {status} |")
+        st.markdown(f"- {check['check']}: {check['value']} → {status}")
     
     st.markdown("**Hard Filters**")
     for f in d["m0_hard_filters"]:
         status = "✅ PASS" if "PASS" in f["result"] else "❌ FAIL"
-        st.markdown(f"| {f['filter']} | {status} |")
+        st.markdown(f"- {f['filter']}: {status}")
     
-    st.markdown("**M0 Verdict:** ✅ **PASS**")
+    st.success("**M0 Verdict:** ✅ PASS")
     
     st.divider()
     
@@ -284,12 +340,12 @@ def show_forensic_report():
         st.markdown(f"PPG: {am['ppg']} | Clean Sheets: {am['clean_sheets']}/20")
     
     st.markdown("**H2H Record**")
-    st.markdown(f"All-time (80+ matches): {d['m1_h2h']['all_time']}")
-    st.markdown(f"Last 10 (2016-2026): {d['m1_h2h']['last_10']}")
-    st.markdown(f"Last 6 (2023-2026): {d['m1_h2h']['last_6']}")
+    st.markdown(f"- All-time (80+ matches): {d['m1_h2h']['all_time']}")
+    st.markdown(f"- Last 10 (2016-2026): {d['m1_h2h']['last_10']}")
+    st.markdown(f"- Last 6 (2023-2026): {d['m1_h2h']['last_6']}")
     st.markdown(f"**Insight:** {d['m1_h2h']['insight']}")
     
-    st.markdown("**M1 Verdict:** ✅ **Leg built successfully**")
+    st.success("**M1 Verdict:** ✅ Leg built successfully")
     
     st.divider()
     
@@ -298,18 +354,22 @@ def show_forensic_report():
     
     mo = d["m3_odds_analysis"]
     st.markdown("**Odds Analysis**")
-    st.markdown(f"| Outcome | Odds | Implied Prob | Normalized |")
-    st.markdown(f"| {d['home']} (H) | {mo['home_odds']} | {mo['home_implied']}% | {mo['home_model']}% |")
-    st.markdown(f"| Draw | {mo['draw_odds']} | {mo['draw_implied']}% | {mo['draw_model']}% |")
-    st.markdown(f"| {d['away']} (A) | {mo['away_odds']} | {mo['away_implied']}% | {mo['away_model']}% |")
+    
+    odds_df = pd.DataFrame([
+        {"Outcome": d['home'], "Odds": mo['home_odds'], "Implied Prob": f"{mo['home_implied']}%", "Normalized": f"{mo['home_model']}%"},
+        {"Outcome": "Draw", "Odds": mo['draw_odds'], "Implied Prob": f"{mo['draw_implied']}%", "Normalized": f"{mo['draw_model']}%"},
+        {"Outcome": d['away'], "Odds": mo['away_odds'], "Implied Prob": f"{mo['away_implied']}%", "Normalized": f"{mo['away_model']}%"},
+    ])
+    st.table(odds_df)
+    
     st.markdown(f"**Bookmaker Margin:** {mo['margin']}%")
     
     st.markdown("**Edge Calculation**")
-    st.markdown(f"Model Probability: {mo['away_model']}%")
-    st.markdown(f"Implied Probability (1/{mo['away_odds']}): {mo['away_implied']}%")
-    st.markdown(f"**Edge: {mo['edge']:+}% (NEGATIVE)**")
+    st.markdown(f"- Model Probability: {mo['away_model']}%")
+    st.markdown(f"- Implied Probability (1/{mo['away_odds']}): {mo['away_implied']}%")
+    st.warning(f"**Edge: {mo['edge']:+}% (NEGATIVE)**")
     
-    st.markdown("**M3 Verdict:** ⚠️ **Negative edge detected**")
+    st.info("**M3 Verdict:** ⚠️ Negative edge detected")
     
     st.divider()
     
@@ -319,9 +379,9 @@ def show_forensic_report():
     st.markdown("**Check Results**")
     for c in d["m4_checks"]:
         status = "✅ PASS" if c["passed"] else "❌ FAIL"
-        st.markdown(f"| {c['check']} | Value: {c['value']} | Threshold: {c['threshold']} | {status} | {c['points']} pts |")
+        st.markdown(f"- {c['check']}: {c['value']} (Threshold: {c['threshold']}) → {status} | {c['points']} pts")
     
-    st.markdown(f"**Passed:** {d['m4_passed']}/{d['m4_total']} → ✅ **PASS**")
+    st.success(f"**Passed:** {d['m4_passed']}/{d['m4_total']} → ✅ PASS")
     
     st.divider()
     
@@ -329,8 +389,8 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 5: FORENSIC CHECKS</p>', unsafe_allow_html=True)
     
     for f in d["m5_failures"]:
-        st.markdown(f"| {f['name']} | +{f['points']} pts |")
-    st.markdown(f"**TOTAL:** {d['m5_total']} / {d['m5_threshold']} → ✅ **PASS**")
+        st.markdown(f"- {f['name']}: +{f['points']} pts")
+    st.success(f"**TOTAL:** {d['m5_total']} / {d['m5_threshold']} → ✅ PASS")
     
     st.divider()
     
@@ -339,10 +399,10 @@ def show_forensic_report():
     
     st.markdown("**Injuries & Suspensions**")
     for inj in d["m6_injuries"]:
-        st.markdown(f"| {inj['team']} | {inj['player']} ({inj['position']}) | {inj['reason']} | {inj['status']} |")
+        st.markdown(f"- {inj['team']}: {inj['player']} ({inj['position']}) - {inj['reason']} - {inj['status']}")
     
     st.markdown(f"**Personnel Scores:** {d['home']}: {d['m6_scores']['Derry City']}/100 | {d['away']}: {d['m6_scores']['Bohemians FC']}/100")
-    st.markdown("**M6 Verdict:** ⚠️ **Personnel edge to Derry** (Bohemians missing GK is significant)")
+    st.info("**M6 Verdict:** ⚠️ Personnel edge to Derry (Bohemians missing GK is significant)")
     
     st.divider()
     
@@ -350,10 +410,10 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 7: QUAD-AI INTELLIGENCE</p>', unsafe_allow_html=True)
     
     for ai in d["m7_ai"]:
-        st.markdown(f"| {ai['provider']} | {ai['verdict']} | {ai['confidence']} | {ai['reasoning']} |")
+        st.markdown(f"- **{ai['provider']}**: {ai['verdict']} ({ai['confidence']} confidence) - {ai['reasoning']}")
     
     st.markdown(f"**Consensus:** {d['m7_consensus']} (Agreement: {d['m7_agreement']}%)")
-    st.markdown("**M7 Verdict:** ⚠️ **CAUTION** (split decision)")
+    st.info("**M7 Verdict:** ⚠️ CAUTION (split decision)")
     
     st.divider()
     
@@ -361,25 +421,24 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 8: DUAL PATTERN ENGINE (v6)</p>', unsafe_allow_html=True)
     
     st.markdown("**H2H vs Current Season CONFLICT DETECTION**")
-    st.markdown(f"| Signal | Value |")
-    st.markdown(f"| H2H all-time | {d['home']} DOMINANT ({d['m8_h2h_all_time']['derry']}% vs {d['m8_h2h_all_time']['bohemians']}%) |")
-    st.markdown(f"| H2H recent (last 6) | {d['home']} still leads ({d['m8_h2h_last6']['derry']}% vs {d['m8_h2h_last6']['bohemians']}%) |")
-    st.markdown(f"| Current season | {d['away']} DOMINANT ({d['m8_current_season']['bohemians']}% vs {d['m8_current_season']['derry']}%) |")
-    st.markdown(f"| **Conflict severity** | **{d['m8_severity']}** |")
+    st.markdown(f"- H2H all-time: {d['home']} DOMINANT ({d['m8_h2h_all_time']['derry']}% vs {d['m8_h2h_all_time']['bohemians']}%)")
+    st.markdown(f"- H2H recent (last 6): {d['home']} still leads ({d['m8_h2h_last6']['derry']}% vs {d['m8_h2h_last6']['bohemians']}%)")
+    st.markdown(f"- Current season: {d['away']} DOMINANT ({d['m8_current_season']['bohemians']}% vs {d['m8_current_season']['derry']}%)")
+    st.error(f"**Conflict severity:** {d['m8_severity']}")
     
-    st.markdown("**🚨 CONFLICT DETECTED**")
+    st.error("**🚨 CONFLICT DETECTED**")
     st.markdown("**M8 v6 Rule:** *If ANY conflict detected → HARD REJECT (stake multiplier = 0.0)*")
-    st.markdown(f"**M8 Verdict:** 🚨 **{d['m8_verdict']}**")
+    st.error(f"**M8 Verdict:** 🚨 {d['m8_verdict']}")
     
     st.divider()
     
     # ========== MODULE 9 ==========
     st.markdown('<p class="module-header">MODULE 9: UNDERDOG SCANNER</p>', unsafe_allow_html=True)
     
-    st.markdown(f"Underdog Edge: {d['m9_underdog_edge']:+}%")
-    st.markdown(f"Threat Level: {d['m9_threat_level']}")
-    st.markdown(f"Goldmine Qualified: {'Yes' if d['m9_goldmine'] else 'No'}")
-    st.markdown("**M9 Verdict:** ⚠️ **Low underdog threat**")
+    st.markdown(f"- Underdog Edge: {d['m9_underdog_edge']:+}%")
+    st.markdown(f"- Threat Level: {d['m9_threat_level']}")
+    st.markdown(f"- Goldmine Qualified: {'Yes' if d['m9_goldmine'] else 'No'}")
+    st.info("**M9 Verdict:** ⚠️ Low underdog threat")
     
     st.divider()
     
@@ -387,17 +446,51 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 10: SEASON TALLY MATRIX</p>', unsafe_allow_html=True)
     
     st.markdown("**Bilateral Intersection**")
-    st.markdown(f"| Outcome | Probability |")
-    st.markdown(f"| {d['home']} Win | {d['m10_bilateral']['home']}% |")
-    st.markdown(f"| Draw | {d['m10_bilateral']['draw']}% |")
-    st.markdown(f"| {d['away']} Win | {d['m10_bilateral']['away']}% |")
+    matrix_df = pd.DataFrame([
+        {"Outcome": d['home'], "Probability": f"{d['m10_bilateral']['home']}%"},
+        {"Outcome": "Draw", "Probability": f"{d['m10_bilateral']['draw']}%"},
+        {"Outcome": d['away'], "Probability": f"{d['m10_bilateral']['away']}%"},
+    ])
+    st.table(matrix_df)
+    
     st.markdown(f"**Confidence:** {d['m10_confidence']}")
     st.markdown(f"**Trap/Value Signal:** {d['m10_trap_signal']}")
-    st.markdown("**M10 Verdict:** ⚠️ **No value detected**")
+    st.info("**M10 Verdict:** ⚠️ No value detected")
     
     st.divider()
     
     # ========== FINAL VERDICT ==========
     st.markdown('<p class="module-header">FINAL VERDICT</p>', unsafe_allow_html=True)
     
-    st.markdown(f"""
+    st.error(f"**Verdict:** {d['final_verdict']}")
+    st.warning(f"**Recommended Stake:** €{d['final_stake']}")
+    st.info(f"**Reasoning:** {d['final_reason']}")
+    
+    st.divider()
+    
+    # Summary table
+    st.markdown("### Module Summary")
+    summary_data = {
+        "Module": ["M0", "M1", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"],
+        "Status": ["✅ PASS", "✅ PASS", "⚠️ EDGE", "✅ PASS", "✅ PASS", "⚠️ CAUTION", "⚠️ CAUTION", "🚨 REJECT", "⚠️ LOW", "⚠️ NO VALUE"],
+        "Description": [
+            "Data integrity passed",
+            "Stats ingested",
+            "Negative edge",
+            "7/8 checks passed",
+            "Below threshold",
+            "Personnel concerns",
+            "Split decision",
+            "CONFLICT DETECTED",
+            "Low underdog threat",
+            "No value found"
+        ]
+    }
+    summary_df = pd.DataFrame(summary_data)
+    st.table(summary_df)
+
+# ========== MAIN ROUTING ==========
+if st.session_state.page == "dashboard":
+    show_dashboard()
+elif st.session_state.page == "forensic_report":
+    show_forensic_report()
