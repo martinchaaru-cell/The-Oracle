@@ -12,6 +12,24 @@ st.set_page_config(
     layout="wide"
 )
 
+# ========== API KEY CONFIGURATION ==========
+def get_api_keys():
+    """Get API keys from secrets or session state"""
+    try:
+        football_key = st.secrets.get("APIFOOTBALL_KEY", "")
+        odds_key = st.secrets.get("ODDS_API_KEY", "")
+        backend_url = st.secrets.get("BACKEND_URL", "")
+        if football_key:
+            return football_key, odds_key, backend_url
+    except:
+        pass
+    
+    football_key = st.session_state.get("football_key", "")
+    odds_key = st.session_state.get("odds_key", "")
+    backend_url = st.session_state.get("backend_url", "https://oracle-backend-1-vryo.onrender.com")
+    
+    return football_key, odds_key, backend_url
+
 # ========== MOCK DATA ==========
 # Today's fixtures sorted by time (earliest first)
 MOCK_FIXTURES = [
@@ -24,30 +42,12 @@ MOCK_FIXTURES = [
     {"id": 7, "home": "Real Madrid", "away": "Barcelona", "league": "La Liga", "time": "20:00", "odds": 2.25, "status": "NS"},
 ]
 
-# Group fixtures by league
-def group_fixtures_by_league(fixtures):
-    grouped = {}
-    for f in fixtures:
-        league = f['league']
-        if league not in grouped:
-            grouped[league] = []
-        grouped[league].append(f)
-    # Sort fixtures within each league by time
-    for league in grouped:
-        grouped[league].sort(key=lambda x: x['time'])
-    return grouped
-
 # Live matches
 MOCK_LIVE = [
     {"id": 8, "home": "AC Milan", "away": "Roma", "league": "Serie A", "time": "LIVE 67'", "home_score": 2, "away_score": 1, "status": "LIVE"},
 ]
 
-# Finished matches
-MOCK_FINISHED = [
-    {"id": 9, "home": "Tottenham", "away": "Man United", "league": "Premier League", "time": "FT", "home_score": 1, "away_score": 1, "result": "DRAW", "status": "FT"},
-]
-
-# Analytics data
+# League stats
 LEAGUE_STATS = [
     {"league": "Premier League", "count": 12, "accuracy": 62, "roi": 15.2},
     {"league": "La Liga", "count": 10, "accuracy": 58, "roi": 9.8},
@@ -56,29 +56,29 @@ LEAGUE_STATS = [
     {"league": "Ligue 1", "count": 6, "accuracy": 61, "roi": 13.4},
 ]
 
+# Bankroll history
 BANKROLL_HISTORY = [
-    {"date": "Jun 1", "bankroll": 10000},
-    {"date": "Jun 2", "bankroll": 10250},
-    {"date": "Jun 3", "bankroll": 10500},
-    {"date": "Jun 4", "bankroll": 10300},
-    {"date": "Jun 5", "bankroll": 10800},
-    {"date": "Jun 6", "bankroll": 11200},
-    {"date": "Jun 7", "bankroll": 11800},
-    {"date": "Jun 8", "bankroll": 12450},
+    {"date": "Jun 1", "bankroll": 10000}, {"date": "Jun 2", "bankroll": 10250},
+    {"date": "Jun 3", "bankroll": 10500}, {"date": "Jun 4", "bankroll": 10300},
+    {"date": "Jun 5", "bankroll": 10800}, {"date": "Jun 6", "bankroll": 11200},
+    {"date": "Jun 7", "bankroll": 11800}, {"date": "Jun 8", "bankroll": 12450},
 ]
 
+# Top picks
 TOP_PICKS = [
     {"match": "Arsenal vs Chelsea", "selection": "Arsenal", "odds": 2.10, "prob": 62, "edge": 8.1},
     {"match": "Bayern vs Dortmund", "selection": "Bayern", "odds": 1.75, "prob": 58, "edge": 6.7},
     {"match": "Inter vs Juventus", "selection": "Inter", "odds": 2.05, "prob": 55, "edge": 4.2},
 ]
 
+# Parlays
 PARLAYS = {
     "safe": {"legs": ["Arsenal (2.10)", "Bayern (1.75)"], "odds": 3.68, "prob": 36},
     "balanced": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "PSG (1.55)"], "odds": 5.70, "prob": 22},
     "aggressive": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "Inter (2.05)", "Ajax (1.85)"], "odds": 13.95, "prob": 11},
 }
 
+# Countries data
 COUNTRIES = [
     {"flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "England", "leagues": ["Premier League", "Championship", "League One"]},
     {"flag": "🇪🇸", "name": "Spain", "leagues": ["La Liga", "Segunda Division"]},
@@ -92,13 +92,24 @@ COUNTRIES = [
     {"flag": "🇯🇵", "name": "Japan", "leagues": ["J1 League"]},
 ]
 
+# ========== HELPER FUNCTIONS ==========
+def group_fixtures_by_league(fixtures):
+    """Group fixtures by league and sort by time"""
+    grouped = {}
+    for f in fixtures:
+        league = f['league']
+        if league not in grouped:
+            grouped[league] = []
+        grouped[league].append(f)
+    for league in grouped:
+        grouped[league].sort(key=lambda x: x['time'])
+    return grouped
+
 # ========== SESSION STATE ==========
 if "page" not in st.session_state:
     st.session_state.page = "dashboard"
 if "selected_fixture" not in st.session_state:
     st.session_state.selected_fixture = None
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = "upcoming"
 
 # ========== PAGE ROUTING ==========
 def navigate_to(page):
@@ -108,7 +119,7 @@ def navigate_to(page):
 def go_back():
     navigate_to("dashboard")
 
-# ========== FORENSIC REPORT ==========
+# ========== FORENSIC REPORT PAGE ==========
 def show_forensic_report(fixture):
     st.title(f"🔬 {fixture['home']} vs {fixture['away']}")
     st.caption(f"{fixture['league']} | Kickoff: {fixture['time']}")
@@ -167,17 +178,16 @@ def show_forensic_report(fixture):
         st.write("Games: 48 | Fav 29 | Draw 11 | Und 8")
         
         st.divider()
-        
         st.success("✅ FINAL VERDICT: APPROVED (HIGH confidence)")
 
-# ========== DASHBOARD PAGE (Today's Fixtures by League) ==========
+# ========== DASHBOARD PAGE ==========
 def show_dashboard():
     st.title("🎯 MATCH ORACLE")
     st.caption(f"📅 {datetime.now().strftime('%A, %B %d, %Y')} | Live football intelligence")
     
     st.divider()
     
-    # Live matches section (if any)
+    # Live matches section
     if MOCK_LIVE:
         st.subheader("🔴 LIVE NOW")
         for live in MOCK_LIVE:
@@ -194,7 +204,6 @@ def show_dashboard():
     # Group fixtures by league
     grouped_fixtures = group_fixtures_by_league(MOCK_FIXTURES)
     
-    # Display fixtures by league
     for league, fixtures in grouped_fixtures.items():
         st.subheader(f"🏆 {league}")
         
@@ -210,10 +219,10 @@ def show_dashboard():
             
             with col3:
                 st.markdown(f"**{fixture['odds']:.2f}**")
-                st.caption("Best Odds")
+                st.caption("Odds")
             
             with col4:
-                # Edge calculation
+                # Calculate edge
                 edge = (1/fixture['odds'] - 0.45) * 100
                 edge_color = "🟢" if edge > 0 else "🔴"
                 st.markdown(f"{edge_color} **{abs(edge):.1f}%**")
@@ -226,9 +235,8 @@ def show_dashboard():
             
             st.divider()
     
-    # No fixtures message
     if not MOCK_FIXTURES and not MOCK_LIVE:
-        st.info("No fixtures scheduled for today. Check back tomorrow or use Calendar to select another date.")
+        st.info("No fixtures scheduled for today.")
 
 # ========== PERFORMANCE PAGE ==========
 def show_performance():
@@ -239,8 +247,6 @@ def show_performance():
     
     st.divider()
     
-    # Calibration Grade
-    st.subheader("System Calibration")
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Calibration Grade", "B", "Good")
@@ -251,7 +257,6 @@ def show_performance():
     
     st.divider()
     
-    # Accuracy by Confidence
     st.subheader("Accuracy by Confidence Level")
     acc_data = pd.DataFrame({
         "Confidence": ["HIGH", "MEDIUM", "LOW"],
@@ -264,14 +269,12 @@ def show_performance():
     
     st.divider()
     
-    # League Performance
     st.subheader("Performance by League")
     league_df = pd.DataFrame(LEAGUE_STATS)
     st.dataframe(league_df, use_container_width=True, hide_index=True)
     
     st.divider()
     
-    # ROI Chart
     st.subheader("ROI Trend")
     roi_data = pd.DataFrame([
         {"month": "Jan", "roi": 2.1}, {"month": "Feb", "roi": 3.5},
@@ -329,17 +332,16 @@ def show_top_picks():
     st.divider()
     
     for i, pick in enumerate(TOP_PICKS, 1):
-        with st.container():
-            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-            with col1:
-                st.markdown(f"**#{i} {pick['match']}**")
-            with col2:
-                st.write(f"{pick['selection']} @ {pick['odds']:.2f}")
-            with col3:
-                st.write(f"{pick['prob']}% prob")
-            with col4:
-                st.write(f"+{pick['edge']}% edge")
-            st.divider()
+        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+        with col1:
+            st.markdown(f"**#{i} {pick['match']}**")
+        with col2:
+            st.write(f"{pick['selection']} @ {pick['odds']:.2f}")
+        with col3:
+            st.write(f"{pick['prob']}% prob")
+        with col4:
+            st.write(f"+{pick['edge']}% edge")
+        st.divider()
     
     st.info("Top picks are based on highest model probability and edge.")
 
@@ -454,8 +456,8 @@ def show_settings():
         st.success("API key saved (demo mode)")
     
     st.markdown("### Thresholds")
-    home_threshold = st.slider("Home Win Threshold", 0.50, 0.70, 0.57, 0.01)
-    min_edge = st.slider("Minimum Edge", 0.00, 0.15, 0.04, 0.01)
+    st.slider("Home Win Threshold", 0.50, 0.70, 0.57, 0.01)
+    st.slider("Minimum Edge", 0.00, 0.15, 0.04, 0.01)
     
     st.markdown("### Timezone")
     st.info("📍 GMT+3 (Nairobi)")
@@ -465,19 +467,45 @@ def show_settings():
 
 # ========== MAIN ==========
 def main():
-    # Sidebar - Main Menu (no Dashboard label)
+    # Get API keys (for future use)
+    football_key, odds_key, backend_url = get_api_keys()
+    
+    # Sidebar - Main Menu
     with st.sidebar:
         st.markdown("### 🎯 MATCH ORACLE")
         st.markdown("---")
         
-        # Main Menu Items
+        # API Key section
+        with st.expander("🔑 API Keys", expanded=False):
+            st.markdown("**Get free keys from:**")
+            st.markdown("- [API-Football](https://api-football.com/)")
+            st.markdown("- [The Odds API](https://the-odds-api.com/)")
+            
+            key_input = st.text_input(
+                "API-Football Key", 
+                type="password",
+                placeholder="Enter your key",
+                key="api_key_input"
+            )
+            if key_input:
+                st.session_state.football_key = key_input
+                st.success("✅ Key saved")
+        
+        # Show key status
+        if football_key:
+            st.success(f"🔑 API Key: {football_key[:6]}...")
+        else:
+            st.warning("⚠️ No API Key")
+        
+        st.markdown("---")
+        
+        # Menu Items
         st.markdown("**📋 TODAY**")
         if st.button("🏠 Today's Fixtures", use_container_width=True):
             navigate_to("dashboard")
         
         st.markdown("---")
         st.markdown("**📊 ANALYTICS**")
-        
         if st.button("📈 Performance", use_container_width=True):
             navigate_to("performance")
         if st.button("💰 Bankroll", use_container_width=True):
@@ -489,7 +517,6 @@ def main():
         
         st.markdown("---")
         st.markdown("**🔍 DATA**")
-        
         if st.button("📋 All Legs", use_container_width=True):
             navigate_to("all_legs")
         if st.button("🌍 Countries", use_container_width=True):
@@ -503,7 +530,10 @@ def main():
         
         # Status footer
         st.caption(f"🕐 {datetime.now().strftime('%H:%M:%S')} GMT+3")
-        st.caption("📡 DEMO MODE")
+        if football_key:
+            st.caption("🔑 API: Configured")
+        else:
+            st.caption("📡 DEMO MODE")
     
     # Page routing
     page = st.session_state.page
