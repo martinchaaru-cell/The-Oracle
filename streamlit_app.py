@@ -20,12 +20,10 @@ NAIROBI_TZ = pytz.timezone('Africa/Nairobi')
 # ========== BLACK/GOLD THEME CSS ==========
 st.markdown("""
 <style>
-    /* Main background */
     .stApp {
         background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 100%);
     }
     
-    /* Headers - moved up by removing top padding/margin */
     .main-header {
         font-size: 2.5rem;
         font-weight: 800;
@@ -46,58 +44,26 @@ st.markdown("""
         padding-left: 1rem;
     }
     
-    /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Thinner separators */
     hr {
         margin: 2px 0;
         border-color: #2a2a2a;
     }
     
-    /* Smaller buttons */
-    .stButton button {
-        padding: 0px 5px;
-        min-height: 25px;
-        font-size: 0.7rem;
-    }
-    
-    /* Compact columns */
     div[data-testid="column"] {
         padding: 0 2px;
     }
     
-    /* Match row styling */
-    .match-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 4px 0;
-        border-bottom: 1px solid #2a2a2a;
+    /* Make entire row clickable */
+    .clickable-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
     }
-    
-    .match-cell {
-        font-size: 0.85rem;
-    }
-    
-    .odds-cell {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #FFD700;
-        min-width: 50px;
-        text-align: center;
-    }
-    
-    .edge-positive {
-        color: #00FF88;
-        font-weight: 600;
-    }
-    
-    .edge-negative {
-        color: #FF4444;
-        font-weight: 600;
+    .clickable-row:hover {
+        background-color: #1a1a1a;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -143,21 +109,25 @@ MATCHES = [
     {
         "id": 1, "home": "Wexford Youths", "away": "Cork City", "tier": 2,
         "time": "19:45", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
+        "selection": "Cork City", "selection_odds": 2.36,
         "prob": 62, "edge": 4.2, "status": "APPROVED"
     },
     {
         "id": 2, "home": "Derry City", "away": "Bohemians FC", "tier": 2,
         "time": "19:45", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
+        "selection": "Bohemians FC", "selection_odds": 2.36,
         "prob": 54, "edge": 2.3, "status": "REJECTED", "rejection_reason": "H2H CONFLICT"
     },
     {
         "id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "tier": 2,
         "time": "19:45", "home_odds": 1.33, "draw_odds": 4.50, "away_odds": 6.00,
+        "selection": "Shamrock Rovers", "selection_odds": 1.33,
         "prob": 68, "edge": -7.2, "status": "REJECTED", "rejection_reason": "Negative Edge"
     },
     {
         "id": 4, "home": "Ajax", "away": "Feyenoord", "tier": 1,
         "time": "15:00", "home_odds": 1.85, "draw_odds": 3.70, "away_odds": 3.90,
+        "selection": "Ajax", "selection_odds": 1.85,
         "prob": 57, "edge": 5.1, "status": "APPROVED"
     }
 ]
@@ -202,59 +172,76 @@ def navigate_to(page, match=None):
 def go_back():
     navigate_to("dashboard")
 
-# ========== MATCH CARD (COMPACT ROW) ==========
+# ========== MATCH CARD (CLICKABLE ROW) ==========
 def show_match_card(match):
     fid = match.get("id", 0)
     fdata = FORENSIC_DATA.get(fid, {})
     status = fdata.get("status", "PENDING")
     
-    # Status icon
+    # Status icon and color
     if status == "APPROVED":
         status_icon = "✅"
+        status_color = "#00FF88"
     elif status == "REJECTED":
         if "CONFLICT" in fdata.get("verdict_reason", ""):
             status_icon = "🚨"
+            status_color = "#FF4444"
         else:
             status_icon = "❌"
+            status_color = "#FFA500"
     else:
         status_icon = "⚠️"
+        status_color = "#FFD700"
     
     edge = match.get("edge", 0)
     edge_symbol = "+" if edge > 0 else ""
     edge_color = "#00FF88" if edge > 0 else "#FF4444"
     prob = match.get("prob", 50)
+    selection = match.get("selection", "?")
+    selection_odds = match.get("selection_odds", 0)
     
-    # Single row using columns - much more compact
-    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([0.4, 2.0, 0.7, 0.7, 0.7, 0.7, 1.0, 0.5])
+    # Create a unique key for the row click
+    row_key = f"row_{match.get('id', 0)}"
     
-    with col1:
+    # Use HTML div with onclick for entire row
+    st.markdown(f"""
+    <div class="clickable-row" onclick="window.location.href='?page=match_detail&id={match.get('id', 0)}'">
+    """, unsafe_allow_html=True)
+    
+    # Single row using columns - 9 columns now
+    c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.4, 1.8, 0.6, 0.6, 0.6, 0.6, 1.0, 0.6, 0.4])
+    
+    with c1:
         st.write(f"**{match.get('tier', '?')}**")
     
-    with col2:
+    with c2:
         home_short = match.get("home", "?")[:12]
         away_short = match.get("away", "?")[:12]
         st.write(f"{home_short} vs {away_short}")
     
-    with col3:
+    with c3:
         st.write(match.get("time", "TBD"))
     
-    with col4:
+    with c4:
         st.write(f"{match.get('home_odds', 0):.2f}")
     
-    with col5:
+    with c5:
         st.write(f"{match.get('draw_odds', 0):.2f}")
     
-    with col6:
+    with c6:
         st.write(f"{match.get('away_odds', 0):.2f}")
     
-    with col7:
-        st.markdown(f"<span style='color:{edge_color};'>{edge_symbol}{edge:.1f}%</span> {prob}%", unsafe_allow_html=True)
+    with c7:
+        st.markdown(f"{selection} @ {selection_odds:.2f}")
     
-    with col8:
-        st.write(status_icon)
-        if st.button("🔍", key=f"view_{match.get('id', 0)}"):
-            navigate_to("match_detail", match)
+    with c8:
+        st.markdown(f"<span style='color:{edge_color};'>{edge_symbol}{edge:.1f}%</span>", unsafe_allow_html=True)
+        st.caption(f"{prob}%")
     
+    with c9:
+        st.markdown(f"<span style='color:{status_color}; font-size:1.2rem;'>{status_icon}</span>", unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
     st.divider()
 
 # ========== LEG DATA TAB ==========
@@ -329,10 +316,22 @@ def show_forensic_tab(match, fdata):
 
 # ========== MATCH DETAIL ==========
 def show_match_detail():
+    # Get match ID from query params or session state
+    import urllib.parse
+    query_params = st.query_params
+    match_id = query_params.get("id", None)
+    
+    if match_id:
+        match_id = int(match_id)
+        for match in MATCHES:
+            if match.get("id") == match_id:
+                st.session_state.selected_match = match
+                break
+    
     match = st.session_state.selected_match
     if not match:
         st.error("No match selected")
-        if st.button("Back"):
+        if st.button("← Back"):
             go_back()
         return
     
@@ -340,9 +339,9 @@ def show_match_detail():
     fdata = FORENSIC_DATA.get(fid, {})
     
     st.markdown(f"## {match.get('home', '?')} vs {match.get('away', '?')}")
-    st.caption(f"Kickoff: {match.get('time', 'TBD')}")
+    st.caption(f"Kickoff: {match.get('time', 'TBD')} | Selection: {match.get('selection', '?')} @ {match.get('selection_odds', 0):.2f}")
     
-    if st.button("← Back"):
+    if st.button("← Back to Dashboard"):
         go_back()
     
     st.divider()
@@ -355,7 +354,6 @@ def show_match_detail():
 
 # ========== DASHBOARD ==========
 def show_dashboard():
-    # Header moved UP by reducing margin
     st.markdown('<h1 class="main-header">MATCH ORACLE</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">AI-Powered Football Intelligence</p>', unsafe_allow_html=True)
     
@@ -368,7 +366,7 @@ def show_dashboard():
     st.caption(f"{len(MATCHES)} matches • {datetime.now(NAIROBI_TZ).strftime('%A, %B %d, %Y')}")
     
     # Table header
-    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.4, 2.0, 0.7, 0.7, 0.7, 0.7, 1.0, 0.5])
+    c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.4, 1.8, 0.6, 0.6, 0.6, 0.6, 1.0, 0.6, 0.4])
     with c1:
         st.markdown("**Tier**")
     with c2:
@@ -382,8 +380,10 @@ def show_dashboard():
     with c6:
         st.markdown("**Away**")
     with c7:
-        st.markdown("**Edge/Prob**")
+        st.markdown("**Selection**")
     with c8:
+        st.markdown("**Edge/Prob**")
+    with c9:
         st.markdown("**Status**")
     
     st.divider()
@@ -427,7 +427,7 @@ def show_top_picks():
     st.divider()
     for match in MATCHES:
         if FORENSIC_DATA.get(match.get("id", 0), {}).get("status") == "APPROVED":
-            st.write(f"{match.get('home')} vs {match.get('away')}")
+            st.write(f"{match.get('home')} vs {match.get('away')} - {match.get('selection')} @ {match.get('selection_odds'):.2f}")
 
 def show_parlays():
     st.markdown("## Parlays")
@@ -511,6 +511,14 @@ def main():
         
         st.markdown("---")
         st.caption("v4.0")
+    
+    # Handle direct navigation from clickable rows
+    import urllib.parse
+    query_params = st.query_params
+    if "page" in query_params and query_params["page"] == "match_detail":
+        st.session_state.page = "match_detail"
+        # Clear query params to prevent loop
+        st.query_params.clear()
     
     page = st.session_state.page
     if page == "dashboard":
