@@ -40,6 +40,99 @@ st.markdown("""
         margin-bottom: 1.5rem;
     }
     
+    /* Match card styling */
+    .match-card {
+        background: #1a1a1a;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 12px;
+        border: 1px solid #333;
+        transition: all 0.3s;
+    }
+    
+    .match-card:hover {
+        border-color: #FFD700;
+        transform: translateX(5px);
+    }
+    
+    .match-teams {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #FFD700;
+        margin-bottom: 5px;
+    }
+    
+    .match-meta {
+        font-size: 0.7rem;
+        color: #888;
+        margin-bottom: 10px;
+    }
+    
+    .odds-row {
+        display: flex;
+        gap: 15px;
+        margin: 10px 0;
+    }
+    
+    .odds-item {
+        background: #0a0a0a;
+        border-radius: 8px;
+        padding: 5px 12px;
+        text-align: center;
+        border: 1px solid #333;
+    }
+    
+    .odds-label {
+        font-size: 0.6rem;
+        color: #888;
+    }
+    
+    .odds-value {
+        font-size: 1rem;
+        font-weight: bold;
+        color: #FFD700;
+    }
+    
+    .verdict-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+    
+    .verdict-approved {
+        background: #00FF8820;
+        color: #00FF88;
+        border: 1px solid #00FF88;
+    }
+    
+    .verdict-rejected {
+        background: #FF444420;
+        color: #FF4444;
+        border: 1px solid #FF4444;
+    }
+    
+    .verdict-caution {
+        background: #FFA50020;
+        color: #FFA500;
+        border: 1px solid #FFA500;
+    }
+    
+    .confidence-bar {
+        background: #333;
+        border-radius: 10px;
+        height: 4px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+    
+    .confidence-fill {
+        background: #FFD700;
+        height: 100%;
+        border-radius: 10px;
+    }
+    
     .module-header {
         font-size: 1.2rem;
         font-weight: bold;
@@ -68,11 +161,6 @@ st.markdown("""
     .match-venue {
         font-size: 0.9rem;
         color: #888;
-    }
-    
-    .match-time {
-        font-size: 1.2rem;
-        color: #FFD700;
     }
     
     .section-header {
@@ -150,10 +238,9 @@ st.markdown("""
         border-radius: 8px;
         padding: 10px;
         text-align: center;
-        transition: all 0.3s;
     }
     
-    .odds-value {
+    .odds-value-large {
         font-size: 1.3rem;
         font-weight: bold;
         color: #FFD700;
@@ -185,24 +272,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 10px;
     }
-    
-    .dashboard-card {
-        background: #1a1a1a;
-        border-radius: 15px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #FFD70030;
-        transition: all 0.3s;
-    }
-    
-    .dashboard-card:hover {
-        border-color: #FFD700;
-        transform: translateY(-2px);
-    }
-    
-    .verdict-pass { color: #00FF88; font-weight: bold; }
-    .verdict-fail { color: #FF4444; font-weight: bold; }
-    .verdict-warn { color: #FFA500; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -221,99 +290,171 @@ updateClock();
 </script>
 """, unsafe_allow_html=True)
 
-# ========== FORENSIC DATA ==========
+# ========== MATCHES DATA ==========
+MATCHES = [
+    {
+        "id": 1,
+        "home": "Manchester City",
+        "away": "Bournemouth",
+        "date": "2026-06-11",
+        "venue": "Etihad Stadium",
+        "home_odds": 2.15,
+        "draw_odds": 4.30,
+        "away_odds": 7.52,
+        "verdict": "REJECTED",
+        "confidence": 46.5,
+        "home_win_prob": 46.5,
+        "draw_prob": 22.5,
+        "away_win_prob": 31.0
+    },
+    {
+        "id": 2,
+        "home": "Liverpool",
+        "away": "Sheffield United",
+        "date": "2026-06-11",
+        "venue": "Anfield",
+        "home_odds": 2.35,
+        "draw_odds": 4.70,
+        "away_odds": 8.22,
+        "verdict": "REJECTED",
+        "confidence": 42.5,
+        "home_win_prob": 42.5,
+        "draw_prob": 21.3,
+        "away_win_prob": 36.2
+    },
+    {
+        "id": 3,
+        "home": "Arsenal",
+        "away": "Nottingham Forest",
+        "date": "2026-06-11",
+        "venue": "Emirates Stadium",
+        "home_odds": 2.10,
+        "draw_odds": 4.20,
+        "away_odds": 7.35,
+        "verdict": "REJECTED",
+        "confidence": 47.6,
+        "home_win_prob": 47.6,
+        "draw_prob": 23.8,
+        "away_win_prob": 28.6
+    },
+    {
+        "id": 4,
+        "home": "Chelsea",
+        "away": "Burnley",
+        "date": "2026-06-11",
+        "venue": "Stamford Bridge",
+        "home_odds": 2.55,
+        "draw_odds": 5.10,
+        "away_odds": 8.92,
+        "verdict": "REJECTED",
+        "confidence": 39.2,
+        "home_win_prob": 39.2,
+        "draw_prob": 19.6,
+        "away_win_prob": 41.2
+    },
+    {
+        "id": 5,
+        "home": "Real Madrid",
+        "away": "Almeria",
+        "date": "2026-06-11",
+        "venue": "Santiago Bernabeu",
+        "home_odds": 2.05,
+        "draw_odds": 4.10,
+        "away_odds": 7.17,
+        "verdict": "REJECTED",
+        "confidence": 48.8,
+        "home_win_prob": 48.8,
+        "draw_prob": 24.4,
+        "away_win_prob": 26.8
+    }
+]
+
+# ========== FORENSIC DATA (for first match) ==========
 FORENSIC_DATA = {
     "match_id": 1,
-    "home": "Derry City",
-    "away": "Bohemians FC",
-    "league": "Ireland Premier League",
-    "venue": "Brandywell Stadium",
+    "home": "Manchester City",
+    "away": "Bournemouth",
+    "league": "Premier League",
+    "venue": "Etihad Stadium",
     "date": "June 12, 2026",
-    "home_odds": 2.90,
-    "draw_odds": 3.20,
-    "away_odds": 2.36,
-    "final_verdict": "REJECTED (H2H CONFLICT)",
+    "home_odds": 2.15,
+    "draw_odds": 4.30,
+    "away_odds": 7.52,
+    "final_verdict": "REJECTED",
     "final_stake": 0.00,
-    "final_reason": "H2H conflict between historical dominance (Derry) and current form (Bohemians)",
+    "final_reason": "Negative edge detected with low confidence",
     
     "m0_checks": [
         {"check": "Fixture Status", "value": "NS (upcoming)", "result": "PASS"},
-        {"check": "Odds present", "value": "2.90/3.20/2.36", "result": "PASS"},
-        {"check": "Odds bounds", "value": "All >1.01, <100", "result": "PASS"},
+        {"check": "Odds present", "value": "2.15/4.30/7.52", "result": "PASS"},
     ],
     "m0_hard_filters": [
         {"filter": "Senior Men's League", "result": "PASS"},
-        {"filter": "League Tier", "result": "PASS (Ireland Tier 1)"},
-        {"filter": "Maturity (≥10 games)", "result": "PASS (20 games each)"},
+        {"filter": "League Tier", "result": "PASS (Tier 1)"},
     ],
     
     "m1_home_metrics": {
-        "games": 20, "wins": 4, "draws": 10, "losses": 6,
-        "goals_for": 22, "goals_against": 23,
-        "home_record": "3-5-2", "home_wr": 30,
-        "recent_form": "L, D, D, D, L, L",
-        "ppg": 1.10, "clean_sheets": 5
+        "games": 20, "wins": 14, "draws": 4, "losses": 2,
+        "goals_for": 48, "goals_against": 18,
+        "home_record": "8-1-1", "home_wr": 80,
+        "recent_form": "W, W, D, W, W, L",
+        "ppg": 2.30
     },
     "m1_away_metrics": {
-        "games": 20, "wins": 9, "draws": 7, "losses": 4,
-        "goals_for": 31, "goals_against": 21,
-        "away_record": "6-2-2", "away_wr": 60,
-        "recent_form": "W, L, W, D, W, W",
-        "ppg": 1.70, "clean_sheets": 7
+        "games": 20, "wins": 5, "draws": 6, "losses": 9,
+        "goals_for": 22, "goals_against": 31,
+        "away_record": "2-3-5", "away_wr": 20,
+        "recent_form": "L, D, L, L, W, D",
+        "ppg": 1.05
     },
     "m1_h2h": {
-        "all_time": "Derry 46% (37), Draw 30% (24), Bohemians 24% (19)",
-        "last_10": "Derry 4, Draw 3, Bohemians 3",
-        "last_6": "Derry 2, Draw 3, Bohemians 1",
-        "insight": "Derry City has HISTORICAL dominance but recent H2H is balanced"
+        "all_time": "Man City 70%, Draw 20%, Bournemouth 10%",
+        "insight": "Man City has complete historical dominance"
     },
     
     "m3_odds_analysis": {
-        "home_odds": 2.90, "home_implied": 34.5, "home_model": 30,
-        "draw_odds": 3.20, "draw_implied": 31.3, "draw_model": 30,
-        "away_odds": 2.36, "away_implied": 42.4, "away_model": 40,
-        "margin": 8.2, "edge": -2.4
+        "home_odds": 2.15, "home_implied": 46.5, "home_model": 42,
+        "draw_odds": 4.30, "draw_implied": 23.3, "draw_model": 25,
+        "away_odds": 7.52, "away_implied": 13.3, "away_model": 33,
+        "margin": 16.9, "edge": -4.5
     },
     
     "m4_checks": [
-        {"check": "C1: Season Win Gap", "passed": True, "value": "+5 wins", "points": 10},
-        {"check": "C2: Venue Win Gap", "passed": True, "value": "+30%", "points": 10},
-        {"check": "C3: H2H Favoured", "passed": False, "value": "24%", "points": 0},
-        {"check": "C4: Transition Favours", "passed": True, "value": "~50%", "points": 8},
+        {"check": "C1: Season Win Gap", "passed": True, "value": "+9 wins", "points": 10},
+        {"check": "C2: Venue Win Gap", "passed": True, "value": "+60%", "points": 10},
+        {"check": "C3: H2H Favoured", "passed": True, "value": "70%", "points": 10},
     ],
     "m4_passed": 7, "m4_total": 8,
     
     "m5_failures": [
-        {"name": "Low Season Win Count (Derry)", "points": 0.5},
-        {"name": "Low Home Wins at Venue (Derry)", "points": 1.0},
+        {"name": "Negative Edge Detected", "points": 2.0},
+        {"name": "Low Confidence Threshold", "points": 1.5},
     ],
-    "m5_total": 2.5, "m5_threshold": 4.5,
+    "m5_total": 3.5, "m5_threshold": 4.5,
     
     "m6_injuries": [
-        {"team": "Derry City", "player": "P. McClean", "position": "D", "status": "OUT"},
-        {"team": "Bohemians FC", "player": "B. Maher", "position": "G", "status": "OUT"},
+        {"team": "Manchester City", "player": "J. Grealish", "position": "M", "status": "DOUBTFUL"},
     ],
-    "m6_scores": {"Derry City": 55, "Bohemians FC": 45},
+    "m6_scores": {"Manchester City": 75, "Bournemouth": 65},
     
     "m7_ai": [
-        {"provider": "DeepSeek", "verdict": "CAUTION", "reasoning": "Form strong but H2H favours Derry"},
-        {"provider": "Claude", "verdict": "CAUTION", "reasoning": "Missing GK is concern"},
-        {"provider": "Gemini", "verdict": "APPROVE", "reasoning": "League position dominant"},
-        {"provider": "GPT", "verdict": "REJECT", "reasoning": "H2H conflict"},
+        {"provider": "DeepSeek", "verdict": "CAUTION", "reasoning": "Low confidence in prediction"},
+        {"provider": "Claude", "verdict": "REJECT", "reasoning": "Negative edge"},
+        {"provider": "Gemini", "verdict": "CAUTION", "reasoning": "Injury concerns"},
+        {"provider": "GPT", "verdict": "REJECT", "reasoning": "Value not found"},
     ],
-    "m7_consensus": "CAUTION", "m7_agreement": 25,
+    "m7_consensus": "REJECT", "m7_agreement": 75,
     
-    "m8_h2h_all_time": {"derry": 46, "bohemians": 24},
-    "m8_h2h_last6": {"derry": 33, "bohemians": 17},
-    "m8_current_season": {"derry": 20, "bohemians": 45},
-    "m8_severity": "HIGH",
-    "m8_verdict": "HARD REJECT",
+    "m8_h2h_all_time": {"home": 70, "away": 10},
+    "m8_current_season": {"home": 70, "away": 25},
+    "m8_severity": "LOW",
+    "m8_verdict": "APPROVE",
     
-    "m9_underdog_edge": -5,
+    "m9_underdog_edge": -8,
     "m9_threat_level": "LOW",
     
-    "m10_bilateral": {"home": 28, "draw": 32, "away": 40},
-    "m10_confidence": "LOW",
+    "m10_bilateral": {"home": 45, "draw": 25, "away": 30},
+    "m10_confidence": "MEDIUM",
 }
 
 # ========== LEAGUE DATA ==========
@@ -397,9 +538,13 @@ LEAGUE_DATA = {
 # ========== SESSION STATE ==========
 if "page" not in st.session_state:
     st.session_state.page = "dashboard"
+if "selected_match" not in st.session_state:
+    st.session_state.selected_match = None
 
-def navigate_to(page):
+def navigate_to(page, match=None):
     st.session_state.page = page
+    if match:
+        st.session_state.selected_match = match
     st.rerun()
 
 # ========== SIDEBAR NAVIGATION ==========
@@ -411,7 +556,10 @@ with st.sidebar:
         navigate_to("dashboard")
     
     if st.button("🔬 Forensic Report", use_container_width=True):
-        navigate_to("forensic_report")
+        if st.session_state.selected_match:
+            navigate_to("forensic_report")
+        else:
+            navigate_to("forensic_report")
     
     if st.button("📋 League Analysis", use_container_width=True):
         navigate_to("league_analysis")
@@ -430,95 +578,82 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Version:** 2.0.0")
 
-# ========== DASHBOARD PAGE (CLEAN & MINIMAL) ==========
+# ========== DASHBOARD PAGE (MATCH LIST STYLE) ==========
 def show_dashboard():
-    d = FORENSIC_DATA
-    
-    st.markdown('<p class="gold-header">🎯 Match Oracle Dashboard</p>', unsafe_allow_html=True)
+    st.markdown('<p class="gold-header">🎯 Match Oracle</p>', unsafe_allow_html=True)
     st.markdown('<p class="gold-subheader">Forensic Betting Intelligence | AI-Powered Match Analysis</p>', unsafe_allow_html=True)
     
-    # Featured Match Card
-    st.markdown("### 🔥 Featured Match")
-    
-    col1, col2, col3 = st.columns([2, 1, 2])
-    
+    # Header row with H D A labels
+    col1, col2, col3, col4, col5 = st.columns([2.5, 1.5, 1, 1, 1.5])
     with col1:
-        st.markdown(f"### 🏠 {d['home']}")
-        st.metric("League Position", "8th", delta="-2")
-        st.metric("PPG", d['m1_home_metrics']['ppg'])
-        st.metric("Recent Form", d['m1_home_metrics']['recent_form'])
-        st.metric("Odds", d['home_odds'])
-    
+        st.markdown("**Match**")
     with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("### VS")
-        st.markdown("---")
-        st.markdown(f"**Draw Odds:** {d['draw_odds']}")
-        st.markdown("---")
-        st.error(f"**Verdict:** {d['final_verdict']}")
-    
+        st.markdown("**H**")
     with col3:
-        st.markdown(f"### ✈️ {d['away']}")
-        st.metric("League Position", "2nd", delta="+5")
-        st.metric("PPG", d['m1_away_metrics']['ppg'])
-        st.metric("Recent Form", d['m1_away_metrics']['recent_form'])
-        st.metric("Odds", d['away_odds'])
-    
-    st.divider()
-    
-    # Quick Stats
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("H2H All Time", "Derry 46%", delta="Historical Edge")
-    with col2:
-        st.metric("AI Consensus", d['m7_consensus'], delta=f"{d['m7_agreement']}% agreement")
-    with col3:
-        st.metric("Module Status", f"{d['m4_passed']}/8 Passed")
+        st.markdown("**D**")
     with col4:
-        st.metric("Conflict Severity", d['m8_severity'])
+        st.markdown("**A**")
+    with col5:
+        st.markdown("**Verdict**")
     
     st.divider()
     
-    # Quick Navigation Cards
-    st.markdown("### Quick Navigation")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
+    # Display each match as a row
+    for match in MATCHES:
         with st.container():
-            st.markdown("""
-            <div class="dashboard-card">
-                <h3>🔬 Forensic Report</h3>
-                <p>10-module verification system including:</p>
-                <ul style="text-align: left;">
-                    <li>Data Integrity (M0)</li>
-                    <li>Probability Engine (M3)</li>
-                    <li>Asymmetric Pre-filter (M4)</li>
-                    <li>Quad-AI Intelligence (M7)</li>
-                    <li>Dual Pattern Engine (M8)</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("View Forensic Report →", key="forensic_btn", use_container_width=True):
-                navigate_to("forensic_report")
+            col1, col2, col3, col4, col5 = st.columns([2.5, 1.5, 1, 1, 1.5])
+            
+            with col1:
+                st.markdown(f"**{match['home']} vs {match['away']}**")
+                st.caption(f"{match['date']} · {match['venue'].split()[0]}")
+            
+            with col2:
+                st.markdown(f"**{match['home_odds']}**")
+            
+            with col3:
+                st.markdown(f"**{match['draw_odds']}**")
+            
+            with col4:
+                st.markdown(f"**{match['away_odds']}**")
+            
+            with col5:
+                # Verdict badge
+                if match['verdict'] == "REJECTED":
+                    st.markdown(f'<span class="verdict-badge verdict-rejected">🚫 {match["verdict"]}</span>', unsafe_allow_html=True)
+                elif match['verdict'] == "APPROVED":
+                    st.markdown(f'<span class="verdict-badge verdict-approved">✅ {match["verdict"]}</span>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<span class="verdict-badge verdict-caution">⚠️ {match["verdict"]}</span>', unsafe_allow_html=True)
+                
+                # Confidence bar
+                st.markdown(f"""
+                <div style="margin-top: 8px;">
+                    <div style="font-size: 0.7rem; color: #888;">{match['confidence']}%</div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: {match['confidence']}%"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # View button for each match
+            if st.button(f"Analyze", key=f"view_{match['id']}"):
+                # Update forensic data with selected match
+                global FORENSIC_DATA
+                FORENSIC_DATA.update({
+                    "home": match['home'],
+                    "away": match['away'],
+                    "venue": match['venue'],
+                    "home_odds": match['home_odds'],
+                    "draw_odds": match['draw_odds'],
+                    "away_odds": match['away_odds'],
+                    "final_verdict": f"{match['verdict']} ({match['confidence']}%)",
+                })
+                navigate_to("forensic_report", match)
     
-    with col2:
-        with st.container():
-            st.markdown("""
-            <div class="dashboard-card">
-                <h3>📋 League Analysis</h3>
-                <p>Comprehensive match statistics including:</p>
-                <ul style="text-align: left;">
-                    <li>League Standings</li>
-                    <li>Last 6 Matches</li>
-                    <li>Home/Away Splits</li>
-                    <li>Head-to-Head History</li>
-                    <li>Win Probabilities</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-            if st.button("View League Analysis →", key="league_btn", use_container_width=True):
-                navigate_to("league_analysis")
+    st.divider()
+    
+    # Footer
+    st.caption("Select a match and click 'Analyze' to view the complete forensic report.")
 
 # ========== FORENSIC REPORT PAGE ==========
 def show_forensic_report():
@@ -564,7 +699,7 @@ def show_forensic_report():
     st.markdown(f"Home: {mo['home_odds']} (Implied {mo['home_implied']}% | Model {mo['home_model']}%)")
     st.markdown(f"Draw: {mo['draw_odds']} (Implied {mo['draw_implied']}% | Model {mo['draw_model']}%)")
     st.markdown(f"Away: {mo['away_odds']} (Implied {mo['away_implied']}% | Model {mo['away_model']}%)")
-    st.warning(f"**Edge: {mo['edge']:+}% (NEGATIVE)**")
+    st.warning(f"**Edge: {mo['edge']:+}%**")
     st.divider()
     
     # Module 4
@@ -579,14 +714,14 @@ def show_forensic_report():
     st.markdown('<p class="module-header">MODULE 5: FORENSIC CHECKS</p>', unsafe_allow_html=True)
     for f in d["m5_failures"]:
         st.markdown(f"⚠️ {f['name']}: +{f['points']} pts")
-    st.success(f"**TOTAL:** {d['m5_total']} / {d['m5_threshold']} → ✅ PASS")
+    status = "✅ PASS" if d['m5_total'] < d['m5_threshold'] else "❌ FAIL"
+    st.markdown(f"**TOTAL:** {d['m5_total']} / {d['m5_threshold']} → {status}")
     st.divider()
     
     # Module 6
     st.markdown('<p class="module-header">MODULE 6: PERSONNEL FORENSICS</p>', unsafe_allow_html=True)
     for inj in d["m6_injuries"]:
         st.markdown(f"⚠️ {inj['team']}: {inj['player']} ({inj['position']}) - {inj['status']}")
-    st.markdown(f"**Personnel Scores:** {d['home']}: {d['m6_scores']['Derry City']}/100 | {d['away']}: {d['m6_scores']['Bohemians FC']}/100")
     st.divider()
     
     # Module 7
@@ -598,10 +733,9 @@ def show_forensic_report():
     
     # Module 8
     st.markdown('<p class="module-header">MODULE 8: DUAL PATTERN ENGINE</p>', unsafe_allow_html=True)
-    st.markdown(f"H2H all-time: {d['home']} DOMINANT ({d['m8_h2h_all_time']['derry']}% vs {d['m8_h2h_all_time']['bohemians']}%)")
-    st.markdown(f"Current season: {d['away']} DOMINANT ({d['m8_current_season']['bohemians']}% vs {d['m8_current_season']['derry']}%)")
-    st.error(f"**Conflict severity:** {d['m8_severity']}")
-    st.error(f"**M8 Verdict:** 🚨 {d['m8_verdict']}")
+    st.markdown(f"H2H all-time: {d['home']} DOMINANT ({d['m8_h2h_all_time']['home']}% vs {d['m8_h2h_all_time']['away']}%)")
+    st.markdown(f"Current season: {d['home']} DOMINANT ({d['m8_current_season']['home']}% vs {d['m8_current_season']['away']}%)")
+    st.info(f"**Conflict severity:** {d['m8_severity']}")
     st.divider()
     
     # Module 9
@@ -716,17 +850,17 @@ def show_league_analysis():
         st.markdown(f"""
         <div class="odds-button">
             <div class="stat-label">🏠 {d['home']}</div>
-            <div class="odds-value">{d['home_odds']}</div>
+            <div class="odds-value-large">{d['home_odds']}</div>
         </div>
         <br>
         <div class="odds-button">
             <div class="stat-label">🤝 Draw</div>
-            <div class="odds-value">{d['draw_odds']}</div>
+            <div class="odds-value-large">{d['draw_odds']}</div>
         </div>
         <br>
         <div class="odds-button">
             <div class="stat-label">✈️ {d['away']}</div>
-            <div class="odds-value">{d['away_odds']}</div>
+            <div class="odds-value-large">{d['away_odds']}</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -774,7 +908,7 @@ def show_settings():
     st.divider()
     
     st.markdown("### AI Settings")
-    ai_threshold = st.slider("AI Consensus Threshold", 0, 100, 60)
+    st.slider("AI Consensus Threshold", 0, 100, 60)
     st.checkbox("Enable DeepSeek", True)
     st.checkbox("Enable Claude", True)
     st.checkbox("Enable Gemini", True)
