@@ -13,22 +13,36 @@ st.set_page_config(
 )
 
 # ========== MOCK DATA ==========
+# Today's fixtures sorted by time (earliest first)
 MOCK_FIXTURES = [
-    {"id": 1, "home": "Arsenal", "away": "Chelsea", "league": "Premier League", "time": "15:00", "odds": 2.10, "status": "NS"},
-    {"id": 2, "home": "Manchester City", "away": "Liverpool", "league": "Premier League", "time": "17:30", "odds": 1.95, "status": "NS"},
-    {"id": 3, "home": "Bayern Munich", "away": "Borussia Dortmund", "league": "Bundesliga", "time": "15:00", "odds": 1.75, "status": "NS"},
-    {"id": 4, "home": "Real Madrid", "away": "Barcelona", "league": "La Liga", "time": "20:00", "odds": 2.25, "status": "NS"},
-    {"id": 5, "home": "Inter Milan", "away": "Juventus", "league": "Serie A", "time": "19:45", "odds": 2.05, "status": "NS"},
-    {"id": 6, "home": "PSG", "away": "Marseille", "league": "Ligue 1", "time": "16:00", "odds": 1.55, "status": "NS"},
-    {"id": 7, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "time": "14:30", "odds": 1.85, "status": "NS"},
+    {"id": 1, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "time": "12:30", "odds": 1.85, "status": "NS"},
+    {"id": 2, "home": "Arsenal", "away": "Chelsea", "league": "Premier League", "time": "15:00", "odds": 2.10, "status": "NS"},
+    {"id": 3, "home": "Bayern Munich", "away": "Dortmund", "league": "Bundesliga", "time": "15:00", "odds": 1.75, "status": "NS"},
+    {"id": 4, "home": "PSG", "away": "Marseille", "league": "Ligue 1", "time": "16:00", "odds": 1.55, "status": "NS"},
+    {"id": 5, "home": "Manchester City", "away": "Liverpool", "league": "Premier League", "time": "17:30", "odds": 1.95, "status": "NS"},
+    {"id": 6, "home": "Inter Milan", "away": "Juventus", "league": "Serie A", "time": "19:45", "odds": 2.05, "status": "NS"},
+    {"id": 7, "home": "Real Madrid", "away": "Barcelona", "league": "La Liga", "time": "20:00", "odds": 2.25, "status": "NS"},
 ]
 
-# Live matches (for demo)
+# Group fixtures by league
+def group_fixtures_by_league(fixtures):
+    grouped = {}
+    for f in fixtures:
+        league = f['league']
+        if league not in grouped:
+            grouped[league] = []
+        grouped[league].append(f)
+    # Sort fixtures within each league by time
+    for league in grouped:
+        grouped[league].sort(key=lambda x: x['time'])
+    return grouped
+
+# Live matches
 MOCK_LIVE = [
     {"id": 8, "home": "AC Milan", "away": "Roma", "league": "Serie A", "time": "LIVE 67'", "home_score": 2, "away_score": 1, "status": "LIVE"},
 ]
 
-# Finished matches (for demo)
+# Finished matches
 MOCK_FINISHED = [
     {"id": 9, "home": "Tottenham", "away": "Man United", "league": "Premier League", "time": "FT", "home_score": 1, "away_score": 1, "result": "DRAW", "status": "FT"},
 ]
@@ -65,6 +79,19 @@ PARLAYS = {
     "aggressive": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "Inter (2.05)", "Ajax (1.85)"], "odds": 13.95, "prob": 11},
 }
 
+COUNTRIES = [
+    {"flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "England", "leagues": ["Premier League", "Championship", "League One"]},
+    {"flag": "🇪🇸", "name": "Spain", "leagues": ["La Liga", "Segunda Division"]},
+    {"flag": "🇩🇪", "name": "Germany", "leagues": ["Bundesliga", "2. Bundesliga"]},
+    {"flag": "🇮🇹", "name": "Italy", "leagues": ["Serie A", "Serie B"]},
+    {"flag": "🇫🇷", "name": "France", "leagues": ["Ligue 1", "Ligue 2"]},
+    {"flag": "🇳🇱", "name": "Netherlands", "leagues": ["Eredivisie"]},
+    {"flag": "🇵🇹", "name": "Portugal", "leagues": ["Primeira Liga"]},
+    {"flag": "🇧🇷", "name": "Brazil", "leagues": ["Serie A"]},
+    {"flag": "🇦🇷", "name": "Argentina", "leagues": ["Primera Division"]},
+    {"flag": "🇯🇵", "name": "Japan", "leagues": ["J1 League"]},
+]
+
 # ========== SESSION STATE ==========
 if "page" not in st.session_state:
     st.session_state.page = "dashboard"
@@ -81,12 +108,12 @@ def navigate_to(page):
 def go_back():
     navigate_to("dashboard")
 
-# ========== FORENSIC REPORT (Mock) ==========
+# ========== FORENSIC REPORT ==========
 def show_forensic_report(fixture):
     st.title(f"🔬 {fixture['home']} vs {fixture['away']}")
     st.caption(f"{fixture['league']} | Kickoff: {fixture['time']}")
     
-    if st.button("← Back"):
+    if st.button("← Back to Fixtures"):
         go_back()
     
     st.divider()
@@ -143,51 +170,16 @@ def show_forensic_report(fixture):
         
         st.success("✅ FINAL VERDICT: APPROVED (HIGH confidence)")
 
-# ========== DASHBOARD PAGE (Only Today's Fixtures) ==========
+# ========== DASHBOARD PAGE (Today's Fixtures by League) ==========
 def show_dashboard():
     st.title("🎯 MATCH ORACLE")
     st.caption(f"📅 {datetime.now().strftime('%A, %B %d, %Y')} | Live football intelligence")
     
     st.divider()
     
-    # Today's Fixtures Header
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1:
-        st.subheader("📋 Today's Fixtures")
-    with col2:
-        st.caption(f"Total: {len(MOCK_FIXTURES)} matches")
-    with col3:
-        st.caption(f"🕐 {datetime.now().strftime('%H:%M')} GMT+3")
-    
-    st.divider()
-    
-    # Fixture Cards
-    for fixture in MOCK_FIXTURES:
-        with st.container():
-            col1, col2, col3, col4 = st.columns([2.5, 1.5, 1, 1])
-            
-            with col1:
-                st.markdown(f"**{fixture['home']} vs {fixture['away']}**")
-                st.caption(f"{fixture['league']}")
-            
-            with col2:
-                st.markdown(f"**{fixture['time']}**")
-                st.caption("Kickoff")
-            
-            with col3:
-                st.markdown(f"**{fixture['odds']:.2f}**")
-                st.caption("Best Odds")
-            
-            with col4:
-                if st.button("🔍 Details", key=f"btn_{fixture['id']}", use_container_width=True):
-                    st.session_state.selected_fixture = fixture
-                    navigate_to("forensic")
-            
-            st.divider()
-    
     # Live matches section (if any)
     if MOCK_LIVE:
-        st.subheader("🔴 Live Now")
+        st.subheader("🔴 LIVE NOW")
         for live in MOCK_LIVE:
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
@@ -199,76 +191,51 @@ def show_dashboard():
                 st.markdown("🔴 LIVE")
             st.divider()
     
+    # Group fixtures by league
+    grouped_fixtures = group_fixtures_by_league(MOCK_FIXTURES)
+    
+    # Display fixtures by league
+    for league, fixtures in grouped_fixtures.items():
+        st.subheader(f"🏆 {league}")
+        
+        for fixture in fixtures:
+            col1, col2, col3, col4, col5 = st.columns([2.5, 1, 1, 1, 0.8])
+            
+            with col1:
+                st.markdown(f"**{fixture['home']} vs {fixture['away']}**")
+            
+            with col2:
+                st.markdown(f"**{fixture['time']}**")
+                st.caption("Kickoff")
+            
+            with col3:
+                st.markdown(f"**{fixture['odds']:.2f}**")
+                st.caption("Best Odds")
+            
+            with col4:
+                # Edge calculation
+                edge = (1/fixture['odds'] - 0.45) * 100
+                edge_color = "🟢" if edge > 0 else "🔴"
+                st.markdown(f"{edge_color} **{abs(edge):.1f}%**")
+                st.caption("Edge")
+            
+            with col5:
+                if st.button("🔍", key=f"btn_{fixture['id']}", help="View forensic report"):
+                    st.session_state.selected_fixture = fixture
+                    navigate_to("forensic")
+            
+            st.divider()
+    
     # No fixtures message
     if not MOCK_FIXTURES and not MOCK_LIVE:
         st.info("No fixtures scheduled for today. Check back tomorrow or use Calendar to select another date.")
-
-# ========== MENU / NAVIGATION PAGE ==========
-def show_menu():
-    st.title("📱 Menu")
-    st.caption("Navigate to different sections of Match Oracle")
-    
-    st.divider()
-    
-    # Menu Grid
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 📊 Analytics")
-        
-        if st.button("📈 Performance Metrics", use_container_width=True):
-            navigate_to("performance")
-        st.caption("System calibration, accuracy, ROI")
-        
-        if st.button("💰 Bankroll Manager", use_container_width=True):
-            navigate_to("bankroll")
-        st.caption("Track stakes, drawdown, Kelly")
-        
-        if st.button("🏆 Top Picks", use_container_width=True):
-            navigate_to("top_picks")
-        st.caption("Highest probability selections")
-        
-        if st.button("🔗 Parlay Builder", use_container_width=True):
-            navigate_to("parlays")
-        st.caption("Multi-leg accumulator slips")
-    
-    with col2:
-        st.markdown("### 🔍 Data")
-        
-        if st.button("📋 All Legs", use_container_width=True):
-            navigate_to("all_legs")
-        st.caption("Complete fixture list")
-        
-        if st.button("🌍 Country Explorer", use_container_width=True):
-            navigate_to("countries")
-        st.caption("191 countries, leagues, teams")
-        
-        if st.button("📅 Oracle Calendar", use_container_width=True):
-            navigate_to("calendar")
-        st.caption("Scan historical fixtures")
-        
-        if st.button("⚙️ Settings", use_container_width=True):
-            navigate_to("settings")
-        st.caption("API keys, thresholds, config")
-    
-    st.divider()
-    
-    # Quick Stats
-    st.markdown("### 📊 Quick Stats")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Bankroll", "$12,450", "-5.7%")
-    with col2:
-        st.metric("Today's Legs", "47", "+12")
-    with col3:
-        st.metric("System Health", "Grade B", "58%")
 
 # ========== PERFORMANCE PAGE ==========
 def show_performance():
     st.title("📈 Performance Metrics")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -319,12 +286,11 @@ def show_performance():
 def show_bankroll():
     st.title("💰 Bankroll Manager")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
-    # Current Status
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Current Bankroll", "$12,450", "-$750")
@@ -337,7 +303,6 @@ def show_bankroll():
     
     st.divider()
     
-    # Bankroll Chart
     st.subheader("Bankroll History")
     history_df = pd.DataFrame(BANKROLL_HISTORY)
     fig = px.line(history_df, x="date", y="bankroll", markers=True)
@@ -346,7 +311,6 @@ def show_bankroll():
     
     st.divider()
     
-    # Active Stakes
     st.subheader("Active Stakes")
     stakes_data = pd.DataFrame([
         {"Match": "Arsenal vs Chelsea", "Stake": "$127.50", "Odds": 2.10, "Potential": "$267.75"},
@@ -359,8 +323,8 @@ def show_bankroll():
 def show_top_picks():
     st.title("🏆 Top Picks")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -383,8 +347,8 @@ def show_top_picks():
 def show_parlays():
     st.title("🔗 Parlay Builder")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -408,8 +372,8 @@ def show_parlays():
 def show_all_legs():
     st.title("📋 All Legs Analyzed")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -440,25 +404,12 @@ def show_all_legs():
 def show_countries():
     st.title("🌍 Country Explorer")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
-    countries = [
-        {"flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "England", "leagues": ["Premier League", "Championship", "League One"]},
-        {"flag": "🇪🇸", "name": "Spain", "leagues": ["La Liga", "Segunda Division"]},
-        {"flag": "🇩🇪", "name": "Germany", "leagues": ["Bundesliga", "2. Bundesliga"]},
-        {"flag": "🇮🇹", "name": "Italy", "leagues": ["Serie A", "Serie B"]},
-        {"flag": "🇫🇷", "name": "France", "leagues": ["Ligue 1", "Ligue 2"]},
-        {"flag": "🇳🇱", "name": "Netherlands", "leagues": ["Eredivisie"]},
-        {"flag": "🇵🇹", "name": "Portugal", "leagues": ["Primeira Liga"]},
-        {"flag": "🇧🇷", "name": "Brazil", "leagues": ["Serie A"]},
-        {"flag": "🇦🇷", "name": "Argentina", "leagues": ["Primera Division"]},
-        {"flag": "🇯🇵", "name": "Japan", "leagues": ["J1 League"]},
-    ]
-    
-    for country in countries:
+    for country in COUNTRIES:
         with st.expander(f"{country['flag']} {country['name']}"):
             for league in country['leagues']:
                 st.write(f"• {league}")
@@ -467,8 +418,8 @@ def show_countries():
 def show_calendar():
     st.title("📅 Oracle Calendar")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -483,14 +434,14 @@ def show_calendar():
     
     st.markdown("### 📊 Recent Activity")
     for fixture in MOCK_FIXTURES[:5]:
-        st.write(f"📅 {fixture['date'] if 'date' in fixture else 'Jun 11'} | {fixture['home']} vs {fixture['away']} - {fixture['league']}")
+        st.write(f"📅 {datetime.now().strftime('%b %d')} | {fixture['home']} vs {fixture['away']} - {fixture['league']}")
 
 # ========== SETTINGS PAGE ==========
 def show_settings():
     st.title("⚙️ Settings")
     
-    if st.button("← Back to Menu"):
-        navigate_to("menu")
+    if st.button("← Back"):
+        navigate_to("dashboard")
     
     st.divider()
     
@@ -514,21 +465,44 @@ def show_settings():
 
 # ========== MAIN ==========
 def main():
-    # Sidebar - Simple navigation to Dashboard and Menu
+    # Sidebar - Main Menu (no Dashboard label)
     with st.sidebar:
-        st.markdown("### 🎯 Match Oracle")
+        st.markdown("### 🎯 MATCH ORACLE")
+        st.markdown("---")
         
-        if st.button("🏠 Dashboard", use_container_width=True):
+        # Main Menu Items
+        st.markdown("**📋 TODAY**")
+        if st.button("🏠 Today's Fixtures", use_container_width=True):
             navigate_to("dashboard")
         
-        if st.button("📱 Menu", use_container_width=True):
-            navigate_to("menu")
+        st.markdown("---")
+        st.markdown("**📊 ANALYTICS**")
         
-        st.divider()
+        if st.button("📈 Performance", use_container_width=True):
+            navigate_to("performance")
+        if st.button("💰 Bankroll", use_container_width=True):
+            navigate_to("bankroll")
+        if st.button("🏆 Top Picks", use_container_width=True):
+            navigate_to("top_picks")
+        if st.button("🔗 Parlays", use_container_width=True):
+            navigate_to("parlays")
         
-        # Quick status
-        st.caption(f"📅 {datetime.now().strftime('%Y-%m-%d')}")
-        st.caption(f"🕐 {datetime.now().strftime('%H:%M')} GMT+3")
+        st.markdown("---")
+        st.markdown("**🔍 DATA**")
+        
+        if st.button("📋 All Legs", use_container_width=True):
+            navigate_to("all_legs")
+        if st.button("🌍 Countries", use_container_width=True):
+            navigate_to("countries")
+        if st.button("📅 Calendar", use_container_width=True):
+            navigate_to("calendar")
+        if st.button("⚙️ Settings", use_container_width=True):
+            navigate_to("settings")
+        
+        st.markdown("---")
+        
+        # Status footer
+        st.caption(f"🕐 {datetime.now().strftime('%H:%M:%S')} GMT+3")
         st.caption("📡 DEMO MODE")
     
     # Page routing
@@ -536,8 +510,6 @@ def main():
     
     if page == "dashboard":
         show_dashboard()
-    elif page == "menu":
-        show_menu()
     elif page == "forensic":
         if st.session_state.selected_fixture:
             show_forensic_report(st.session_state.selected_fixture)
