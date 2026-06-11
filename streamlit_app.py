@@ -17,7 +17,7 @@ st.set_page_config(
 # ========== TIMEZONE ==========
 NAIROBI_TZ = pytz.timezone('Africa/Nairobi')
 
-# ========== BLACK/GOLD THEME CSS ==========
+# ========== BLACK/GOLD THEME CSS (Only for backgrounds, not for card content) ==========
 st.markdown("""
 <style>
     /* Main background */
@@ -33,7 +33,6 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0;
-        letter-spacing: -0.02em;
     }
     
     .gold-subheader {
@@ -54,10 +53,19 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    
+    /* Card styling */
+    .stCard {
+        background: linear-gradient(135deg, #1a1a1a, #0d0d0d);
+        border: 1px solid #2a2a2a;
+        border-radius: 16px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== LIVE CLOCK ==========
+# ========== LIVE CLOCK (JavaScript - only in header) ==========
 st.markdown("""
 <div id="live-clock" style="position: fixed; top: 10px; right: 20px; color: #FFD700; font-family: monospace; font-size: 1rem; z-index: 999;"></div>
 <script>
@@ -97,14 +105,14 @@ def test_backend_connection(backend_url):
 MATCHES = [
     {
         "id": 1, "home": "Wexford Youths", "away": "Cork City", "league": "League of Ireland", "tier": 2,
-        "time": "19:45", "date": "2025-06-11", "venue": "Ferrycarrig Park",
+        "time": "19:45", "venue": "Ferrycarrig Park",
         "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
         "selection": "Cork City", "selection_odds": 2.36,
         "prob": 62, "edge": 4.2, "confidence": "HIGH", "status": "APPROVED",
     },
     {
         "id": 2, "home": "Derry City", "away": "Bohemians FC", "league": "League of Ireland", "tier": 2,
-        "time": "19:45", "date": "2025-06-11", "venue": "Ryan McBride Brandywell",
+        "time": "19:45", "venue": "Ryan McBride Brandywell",
         "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
         "selection": "Bohemians FC", "selection_odds": 2.36,
         "prob": 54, "edge": 2.3, "confidence": "HIGH", "status": "REJECTED",
@@ -112,7 +120,7 @@ MATCHES = [
     },
     {
         "id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "league": "League of Ireland", "tier": 2,
-        "time": "19:45", "date": "2025-06-11", "venue": "Tallaght Stadium",
+        "time": "19:45", "venue": "Tallaght Stadium",
         "home_odds": 1.33, "draw_odds": 4.50, "away_odds": 6.00,
         "selection": "Shamrock Rovers", "selection_odds": 1.33,
         "prob": 68, "edge": -7.2, "confidence": "HIGH", "status": "REJECTED",
@@ -120,7 +128,7 @@ MATCHES = [
     },
     {
         "id": 4, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "tier": 1,
-        "time": "15:00", "date": "2025-06-11", "venue": "Johan Cruijff ArenA",
+        "time": "15:00", "venue": "Johan Cruijff ArenA",
         "home_odds": 1.85, "draw_odds": 3.70, "away_odds": 3.90,
         "selection": "Ajax", "selection_odds": 1.85,
         "prob": 57, "edge": 5.1, "confidence": "HIGH", "status": "APPROVED",
@@ -140,7 +148,7 @@ FORENSIC_DATA = {
             "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%",
             "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1",
         },
-        "stake": 33.50, "bankroll": 1000, "kelly_raw": 0.085, "kelly_adj": 0.0335,
+        "stake": 33.50, "bankroll": 1000,
     },
     2: {
         "status": "REJECTED",
@@ -198,7 +206,7 @@ def navigate_to(page, match=None):
 def go_back():
     navigate_to("dashboard")
 
-# ========== MATCH CARD ==========
+# ========== MATCH CARD (Using Native Streamlit Components) ==========
 def show_match_card(match):
     fid = match.get('id', 0)
     fdata = FORENSIC_DATA.get(fid, {})
@@ -206,63 +214,61 @@ def show_match_card(match):
     
     # Status badge
     if status == "APPROVED":
-        status_badge = '<span style="background-color: #00FF8820; color: #00FF88; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">✅ APPROVED</span>'
+        status_label = "✅ APPROVED"
+        status_color = "green"
     elif status == "REJECTED":
         if "CONFLICT" in fdata.get('verdict_reason', ''):
-            status_badge = '<span style="background-color: #FF444420; color: #FF4444; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">🚨 H2H CONFLICT</span>'
+            status_label = "🚨 H2H CONFLICT"
+            status_color = "red"
         else:
-            status_badge = '<span style="background-color: #FF444420; color: #FF4444; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">❌ REJECTED</span>'
+            status_label = "❌ REJECTED"
+            status_color = "orange"
     else:
-        status_badge = '<span style="background-color: #FFA50020; color: #FFA500; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">⚠️ PENDING</span>'
+        status_label = "⚠️ PENDING"
+        status_color = "yellow"
     
     edge = match.get('edge', 0)
-    edge_color = "#00FF88" if edge > 0 else "#FF4444"
     edge_symbol = "+" if edge > 0 else ""
+    edge_color = "green" if edge > 0 else "red"
     
     prob = match.get('prob', 50)
     
-    card_html = f"""
-    <div style="background: linear-gradient(135deg, #1a1a1a, #0d0d0d); border: 1px solid #2a2a2a; border-radius: 16px; padding: 1.2rem; margin-bottom: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-            <div>
-                <span style="background-color: #FFD70020; color: #FFD700; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">{match.get('league', '?')} • Tier {match.get('tier', '?')}</span>
-                <h3 style="margin: 0.5rem 0 0.25rem 0; font-size: 1.1rem; color: white;">{match.get('home', '?')} vs {match.get('away', '?')}</h3>
-                <div style="font-size: 0.8rem; color: #888;">🕐 {match.get('time', 'TBD')} • 📍 {match.get('venue', 'TBD')}</div>
-            </div>
-            <div>{status_badge}</div>
-        </div>
+    # Card container
+    with st.container():
+        st.markdown("---")
         
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div style="display: flex; gap: 1rem;">
-                <div style="background-color: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 6px 12px; text-align: center; min-width: 70px;">
-                    <div style="font-size: 1.1rem; font-weight: 700; color: #FFD700;">{match.get('home_odds', 0):.2f}</div>
-                    <div style="font-size: 0.6rem; color: #666;">HOME</div>
-                </div>
-                <div style="background-color: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 6px 12px; text-align: center; min-width: 70px;">
-                    <div style="font-size: 1.1rem; font-weight: 700; color: #FFD700;">{match.get('draw_odds', 0):.2f}</div>
-                    <div style="font-size: 0.6rem; color: #666;">DRAW</div>
-                </div>
-                <div style="background-color: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 6px 12px; text-align: center; min-width: 70px;">
-                    <div style="font-size: 1.1rem; font-weight: 700; color: #FFD700;">{match.get('away_odds', 0):.2f}</div>
-                    <div style="font-size: 0.6rem; color: #666;">AWAY</div>
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <div><span style="color: {edge_color}; font-weight: 700;">{edge_symbol}{edge:.1f}% EDGE</span></div>
-                <div style="font-size: 0.85rem;">🎯 {match.get('selection', '?')} @ {match.get('selection_odds', 0):.2f}</div>
-                <div style="background-color: #2a2a2a; border-radius: 4px; height: 6px; width: 200px; margin-top: 8px;">
-                    <div style="background: linear-gradient(90deg, #FFD700, #FFA500); border-radius: 4px; height: 100%; width: {prob}%;"></div>
-                </div>
-                <div style="font-size: 0.7rem; color: #888;">Model Prob: {prob}%</div>
-            </div>
-        </div>
-    </div>
-    """
-    
-    st.markdown(card_html, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
+        # Row 1: League badge and status
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.caption(f"🏆 {match.get('league', '?')} • Tier {match.get('tier', '?')}")
+        with col2:
+            st.markdown(f"<span style='color: {status_color}; font-weight: bold;'>{status_label}</span>", unsafe_allow_html=True)
+        
+        # Row 2: Teams and time
+        st.markdown(f"### {match.get('home', '?')} vs {match.get('away', '?')}")
+        st.caption(f"🕐 {match.get('time', 'TBD')} • 📍 {match.get('venue', 'TBD')}")
+        
+        st.markdown("---")
+        
+        # Row 3: Odds in columns
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("HOME", f"{match.get('home_odds', 0):.2f}")
+        with col2:
+            st.metric("DRAW", f"{match.get('draw_odds', 0):.2f}")
+        with col3:
+            st.metric("AWAY", f"{match.get('away_odds', 0):.2f}")
+        with col4:
+            st.metric("EDGE", f"{edge_symbol}{edge:.1f}%", delta_color="normal" if edge > 0 else "inverse")
+        
+        # Row 4: Selection and probability
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**🎯 Selection: {match.get('selection', '?')} @ {match.get('selection_odds', 0):.2f}**")
+        with col2:
+            st.progress(prob / 100, text=f"Model Probability: {prob}%")
+        
+        # View button
         if st.button(f"🔍 View Analysis", key=f"view_{match.get('id', 0)}", use_container_width=True):
             navigate_to("match_detail", match)
 
@@ -286,11 +292,11 @@ def show_leg_data(match, fdata):
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"**{match.get('home', 'Home')} Form**")
-        st.markdown(f"<div style='font-size: 1.2rem; letter-spacing: 4px;'>{leg_data.get('home_form', '?')}</div>", unsafe_allow_html=True)
+        st.code(leg_data.get('home_form', '?'), language="text")
         st.caption(f"Position: {leg_data.get('home_position', '?')} | Points: {leg_data.get('home_points', 0)}")
     with col2:
         st.markdown(f"**{match.get('away', 'Away')} Form**")
-        st.markdown(f"<div style='font-size: 1.2rem; letter-spacing: 4px;'>{leg_data.get('away_form', '?')}</div>", unsafe_allow_html=True)
+        st.code(leg_data.get('away_form', '?'), language="text")
         st.caption(f"Position: {leg_data.get('away_position', '?')} | Points: {leg_data.get('away_points', 0)}")
     
     st.divider()
@@ -302,6 +308,7 @@ def show_leg_data(match, fdata):
 # ========== FORENSIC TAB ==========
 def show_forensic_tab(match, fdata):
     st.markdown("### M4: Pre-filter")
+    st.progress(0.75)
     st.info("6/8 checks passed - C5 (Bounce-back Rate) failed")
     
     st.markdown("### M5: Forensic Failures")
@@ -314,31 +321,60 @@ def show_forensic_tab(match, fdata):
     with col1:
         st.metric(f"{match.get('home', 'Home')}", "82/100", "Healthy")
         st.write("Injuries: None")
+        st.write("Fatigue: LOW")
     with col2:
         st.metric(f"{match.get('away', 'Away')}", "65/100", "1 injury")
         st.write("Injuries: 1 (midfielder)")
+        st.write("Fatigue: MEDIUM")
     
     st.markdown("### M7: AI Consensus")
-    st.write("DeepSeek: ✅ APPROVE | Claude: ✅ APPROVE | Gemini: ⚠️ CAUTION | GPT: ✅ APPROVE")
+    st.dataframe(pd.DataFrame([
+        {"Provider": "DeepSeek", "Verdict": "APPROVE", "Confidence": "78%"},
+        {"Provider": "Claude", "Verdict": "APPROVE", "Confidence": "72%"},
+        {"Provider": "Gemini", "Verdict": "CAUTION", "Confidence": "55%"},
+        {"Provider": "GPT", "Verdict": "APPROVE", "Confidence": "75%"},
+    ]), use_container_width=True, hide_index=True)
     st.success("Consensus: 3/4 APPROVE")
     
     st.markdown("### M8: Dual Pattern")
     if "CONFLICT" in fdata.get('verdict_reason', ''):
         st.error("🚨 H2H CONFLICT DETECTED - HARD REJECT")
+        st.info("H2H says Derry wins historically | Current season says Bohemians wins now")
     else:
-        st.info("Dual Risk Level: LOW | Underdog Threat: NONE")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Dual Risk Level", "LOW")
+        with col2:
+            st.metric("Underdog Threat", "NONE")
     
     st.markdown("### M9: Underdog Scanner")
-    st.metric("Underdog Edge", f"{match.get('edge', 0):+.1f}%")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Underdog Edge", f"{match.get('edge', 0):+.1f}%")
+    with col2:
+        st.metric("Threat Level", "LOW")
     
     st.markdown("### M10: Tally Matrix")
     st.success("Bilateral Prediction: HOME (HIGH confidence)")
+    st.info("Trap/Value Signal: NONE")
     
     st.markdown("### M26: Match Context")
-    st.write("Match Importance: 72% | Is Rivalry: Yes")
+    st.metric("Match Importance", "72%")
+    st.write("Is Rivalry: ✅ Yes")
     
     st.markdown("### M27: H2H Analysis")
-    st.write("H2H Score: 78/100 (FAV_EDGE)")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("H2H Score", "78/100", "FAV_EDGE")
+    with col2:
+        st.metric("Draw Rate", "23%")
+    
+    st.divider()
+    
+    # Risk flags
+    st.markdown("### ⚠️ Risk Flags")
+    st.warning("Pattern clash moderate")
+    st.info("H2H bounce-back threat: 45%")
 
 # ========== MATCH DETAIL PAGE ==========
 def show_match_detail():
@@ -373,6 +409,8 @@ def show_match_detail():
         st.divider()
         stake = fdata.get('stake', 0)
         st.success(f"✅ FINAL VERDICT: APPROVED | Stake: £{stake:.2f}")
+    elif "CONFLICT" in fdata.get('verdict_reason', ''):
+        st.error("🚨 FINAL VERDICT: REJECTED (H2H CONFLICT)")
 
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
@@ -388,7 +426,6 @@ def show_dashboard():
     
     st.markdown(f"## 📅 Today's Fixtures")
     st.caption(f"{len(MATCHES)} matches • {datetime.now(NAIROBI_TZ).strftime('%A, %B %d, %Y')}")
-    st.markdown("---")
     
     for match in MATCHES:
         show_match_card(match)
@@ -396,12 +433,13 @@ def show_dashboard():
     st.markdown('<div class="gold-divider"></div>', unsafe_allow_html=True)
     st.caption("© 2025 Match Oracle • AI-powered football intelligence")
 
-# ========== OTHER PAGES (Simplified) ==========
+# ========== OTHER PAGES ==========
 def show_performance():
     st.markdown('<p class="gold-header">📈 Performance Metrics</p>', unsafe_allow_html=True)
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
+    
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Calibration Grade", "B")
@@ -409,27 +447,48 @@ def show_performance():
         st.metric("Brier Score", "0.187")
     with col3:
         st.metric("ECE", "0.094")
+    
+    st.divider()
+    
+    acc_data = pd.DataFrame({"Confidence": ["HIGH", "MEDIUM", "LOW"], "Accuracy": [68, 52, 48]})
+    fig = px.bar(acc_data, x="Confidence", y="Accuracy", color="Confidence", text="Accuracy")
+    fig.update_layout(plot_bgcolor="#1a1a1a", paper_bgcolor="#0a0a0a", font_color="white")
+    st.plotly_chart(fig, use_container_width=True)
 
 def show_bankroll():
     st.markdown('<p class="gold-header">💰 Bankroll Manager</p>', unsafe_allow_html=True)
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Current", "$12,450")
+        st.metric("Current", "$12,450", "-$750")
     with col2:
-        st.metric("Peak", "$13,200")
+        st.metric("Peak", "$13,200", "")
     with col3:
-        st.metric("Drawdown", "5.7%")
+        st.metric("Drawdown", "5.7%", "↓")
     with col4:
         st.metric("Stake Multiplier", "0.85x")
+    
+    st.divider()
+    
+    history = pd.DataFrame([
+        {"date": "Jun 1", "bankroll": 10000}, {"date": "Jun 2", "bankroll": 10250},
+        {"date": "Jun 3", "bankroll": 10500}, {"date": "Jun 4", "bankroll": 10300},
+        {"date": "Jun 5", "bankroll": 10800}, {"date": "Jun 6", "bankroll": 11200},
+        {"date": "Jun 7", "bankroll": 11800}, {"date": "Jun 8", "bankroll": 12450},
+    ])
+    fig = px.line(history, x="date", y="bankroll", markers=True)
+    fig.update_layout(plot_bgcolor="#1a1a1a", paper_bgcolor="#0a0a0a", font_color="white")
+    st.plotly_chart(fig, use_container_width=True)
 
 def show_top_picks():
     st.markdown('<p class="gold-header">🏆 Top Picks</p>', unsafe_allow_html=True)
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
+    
     for match in MATCHES:
         if FORENSIC_DATA.get(match.get('id', 0), {}).get('status') == 'APPROVED':
             st.write(f"**{match.get('home')} vs {match.get('away')}** - {match.get('selection')} @ {match.get('selection_odds'):.2f}")
@@ -446,8 +505,12 @@ def show_all_legs():
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
+    
     for match in MATCHES:
-        st.write(f"{match.get('home')} vs {match.get('away')} - {match.get('league')} - {match.get('time')}")
+        with st.container():
+            st.markdown(f"**{match.get('home')} vs {match.get('away')}**")
+            st.caption(f"{match.get('league')} • {match.get('time')}")
+            st.divider()
 
 def show_countries():
     st.markdown('<p class="gold-header">🌍 Country Explorer</p>', unsafe_allow_html=True)
@@ -488,6 +551,10 @@ def show_settings():
                         st.rerun()
                 except:
                     st.warning("Still waking up...")
+    
+    st.markdown("---")
+    st.markdown("### 🎨 Theme")
+    st.info("Black/Gold Elite Theme Active")
 
 # ========== MAIN ==========
 def main():
