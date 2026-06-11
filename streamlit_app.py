@@ -24,7 +24,7 @@ st.markdown("""
         background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 100%);
     }
     .gold-header {
-        font-size: 2rem;
+        font-size: 1.8rem;
         font-weight: 800;
         background: linear-gradient(135deg, #FFD700, #FFA500);
         -webkit-background-clip: text;
@@ -32,31 +32,33 @@ st.markdown("""
         margin-bottom: 0;
     }
     .gold-subheader {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         color: #B8860B;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
         border-left: 3px solid #FFD700;
         padding-left: 1rem;
     }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    .stProgress > div > div {
-        height: 4px;
+    hr {
+        margin: 0.1rem 0;
+        border-color: #2a2a2a;
+    }
+    .stButton button {
+        padding: 0rem 0.2rem;
+        min-height: 0px;
+        font-size: 0.6rem;
     }
     div[data-testid="column"] {
-        padding: 0 0.2rem;
-    }
-    hr {
-        margin: 0.15rem 0;
-        border-color: #2a2a2a;
+        padding: 0 0.1rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ========== LIVE CLOCK ==========
 st.markdown("""
-<div id="live-clock" style="position: fixed; top: 10px; right: 20px; color: #FFD700; font-family: monospace; font-size: 0.8rem; z-index: 999;"></div>
+<div id="live-clock" style="position: fixed; top: 5px; right: 15px; color: #FFD700; font-family: monospace; font-size: 0.7rem; z-index: 999;"></div>
 <script>
 function updateClock() {
     const now = new Date();
@@ -92,141 +94,41 @@ def test_backend_connection(backend_url):
 
 # ========== MATCH DATA ==========
 MATCHES = [
-    {
-        "id": 1,
-        "home": "Wexford Youths",
-        "away": "Cork City",
-        "league": "League of Ireland",
-        "tier": 2,
-        "time": "19:45",
-        "venue": "Ferrycarrig Park",
-        "home_odds": 2.90,
-        "draw_odds": 3.20,
-        "away_odds": 2.36,
-        "selection": "Cork City",
-        "selection_odds": 2.36,
-        "prob": 62,
-        "edge": 4.2,
-        "confidence": "HIGH",
-        "status": "APPROVED"
-    },
-    {
-        "id": 2,
-        "home": "Derry City",
-        "away": "Bohemians FC",
-        "league": "League of Ireland",
-        "tier": 2,
-        "time": "19:45",
-        "venue": "Ryan McBride Brandywell",
-        "home_odds": 2.90,
-        "draw_odds": 3.20,
-        "away_odds": 2.36,
-        "selection": "Bohemians FC",
-        "selection_odds": 2.36,
-        "prob": 54,
-        "edge": 2.3,
-        "confidence": "HIGH",
-        "status": "REJECTED",
-        "rejection_reason": "H2H CONFLICT"
-    },
-    {
-        "id": 3,
-        "home": "Shamrock Rovers",
-        "away": "Shelbourne FC",
-        "league": "League of Ireland",
-        "tier": 2,
-        "time": "19:45",
-        "venue": "Tallaght Stadium",
-        "home_odds": 1.33,
-        "draw_odds": 4.50,
-        "away_odds": 6.00,
-        "selection": "Shamrock Rovers",
-        "selection_odds": 1.33,
-        "prob": 68,
-        "edge": -7.2,
-        "confidence": "HIGH",
-        "status": "REJECTED",
-        "rejection_reason": "Negative Edge"
-    },
-    {
-        "id": 4,
-        "home": "Ajax",
-        "away": "Feyenoord",
-        "league": "Eredivisie",
-        "tier": 1,
-        "time": "15:00",
-        "venue": "Johan Cruijff ArenA",
-        "home_odds": 1.85,
-        "draw_odds": 3.70,
-        "away_odds": 3.90,
-        "selection": "Ajax",
-        "selection_odds": 1.85,
-        "prob": 57,
-        "edge": 5.1,
-        "confidence": "HIGH",
-        "status": "APPROVED"
-    }
+    {"id": 1, "home": "Wexford Youths", "away": "Cork City", "league": "Ireland", "tier": 2,
+     "time": "19:45", "venue": "Ferrycarrig Park", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
+     "selection": "Cork City", "selection_odds": 2.36, "prob": 62, "edge": 4.2, "status": "APPROVED"},
+    {"id": 2, "home": "Derry City", "away": "Bohemians FC", "league": "Ireland", "tier": 2,
+     "time": "19:45", "venue": "Ryan McBride Brandywell", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
+     "selection": "Bohemians FC", "selection_odds": 2.36, "prob": 54, "edge": 2.3, "status": "REJECTED",
+     "rejection_reason": "H2H CONFLICT"},
+    {"id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "league": "Ireland", "tier": 2,
+     "time": "19:45", "venue": "Tallaght Stadium", "home_odds": 1.33, "draw_odds": 4.50, "away_odds": 6.00,
+     "selection": "Shamrock Rovers", "selection_odds": 1.33, "prob": 68, "edge": -7.2, "status": "REJECTED",
+     "rejection_reason": "Negative Edge"},
+    {"id": 4, "home": "Ajax", "away": "Feyenoord", "league": "Netherlands", "tier": 1,
+     "time": "15:00", "venue": "Johan Cruijff ArenA", "home_odds": 1.85, "draw_odds": 3.70, "away_odds": 3.90,
+     "selection": "Ajax", "selection_odds": 1.85, "prob": 57, "edge": 5.1, "status": "APPROVED"},
 ]
 
 FORENSIC_DATA = {
-    1: {
-        "status": "APPROVED",
-        "verdict_reason": "Clear value: model 62% vs market implied 58%",
-        "leg_data": {
-            "country": "Ireland",
-            "league": "League of Ireland",
-            "venue": "Ferrycarrig Park",
-            "kickoff": "2025-06-11 19:45",
-            "home_form": "L D W L L",
-            "away_form": "W W D L W",
-            "home_position": 8,
-            "away_position": 3,
-            "home_points": 24,
-            "away_points": 38,
-            "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%",
-            "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"
-        },
-        "stake": 33.50,
-        "bankroll": 1000
-    },
-    2: {
-        "status": "REJECTED",
-        "verdict_reason": "H2H CONFLICT: Historical favours Derry, current season favours Bohemians",
-        "leg_data": {
-            "country": "Ireland",
-            "league": "League of Ireland",
-            "venue": "Ryan McBride Brandywell",
-            "kickoff": "2025-06-11 19:45",
-            "home_form": "L L W D L",
-            "away_form": "W W D W L",
-            "home_position": 6,
-            "away_position": 2,
-            "home_points": 28,
-            "away_points": 42,
-            "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%",
-            "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"
-        },
-        "stake": 0
-    },
-    3: {
-        "status": "REJECTED",
-        "verdict_reason": "Negative edge: model 68% vs market 75%",
-        "leg_data": {
-            "country": "Ireland",
-            "league": "League of Ireland",
-            "venue": "Tallaght Stadium",
-            "kickoff": "2025-06-11 19:45",
-            "home_form": "W W D W L",
-            "away_form": "L L D L W",
-            "home_position": 1,
-            "away_position": 7,
-            "home_points": 52,
-            "away_points": 28,
-            "h2h_record": "Shamrock 65% | Draw 20% | Shelbourne 15%",
-            "h2h_last6": "Shamrock 4 | Draw 1 | Shelbourne 1"
-        },
-        "stake": 0
-    }
+    1: {"status": "APPROVED", "verdict_reason": "Clear value: model 62% vs market implied 58%",
+        "leg_data": {"country": "Ireland", "league": "League of Ireland", "venue": "Ferrycarrig Park",
+                     "home_form": "L D W L L", "away_form": "W W D L W", "home_position": 8, "away_position": 3",
+                     "home_points": 24, "away_points": 38,
+                     "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%", "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"},
+        "stake": 33.50, "bankroll": 1000},
+    2: {"status": "REJECTED", "verdict_reason": "H2H CONFLICT: Historical favours Derry, current season favours Bohemians",
+        "leg_data": {"country": "Ireland", "league": "League of Ireland", "venue": "Ryan McBride Brandywell",
+                     "home_form": "L L W D L", "away_form": "W W D W L", "home_position": 6, "away_position": 2,
+                     "home_points": 28, "away_points": 42,
+                     "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%", "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"},
+        "stake": 0},
+    3: {"status": "REJECTED", "verdict_reason": "Negative edge: model 68% vs market 75%",
+        "leg_data": {"country": "Ireland", "league": "League of Ireland", "venue": "Tallaght Stadium",
+                     "home_form": "W W D W L", "away_form": "L L D L W", "home_position": 1, "away_position": 7,
+                     "home_points": 52, "away_points": 28,
+                     "h2h_record": "Shamrock 65% | Draw 20% | Shelbourne 15%", "h2h_last6": "Shamrock 4 | Draw 1 | Shelbourne 1"},
+        "stake": 0},
 }
 
 # ========== SESSION STATE ==========
@@ -254,67 +156,63 @@ def navigate_to(page, match=None):
 def go_back():
     navigate_to("dashboard")
 
-# ========== COMPACT MATCH CARD ==========
+# ========== ULTRA COMPACT MATCH CARD (Single Line) ==========
 def show_match_card(match):
     fid = match.get('id', 0)
     fdata = FORENSIC_DATA.get(fid, {})
     status = fdata.get('status', 'PENDING')
     
     if status == "APPROVED":
-        status_label = "✅ APPROVED"
-        status_color = "green"
+        status_color = "#00FF88"
+        status_icon = "✅"
     elif status == "REJECTED":
         if "CONFLICT" in fdata.get('verdict_reason', ''):
-            status_label = "🚨 H2H CONFLICT"
-            status_color = "red"
+            status_color = "#FF4444"
+            status_icon = "🚨"
         else:
-            status_label = "❌ REJECTED"
-            status_color = "orange"
+            status_color = "#FFA500"
+            status_icon = "❌"
     else:
-        status_label = "⚠️ PENDING"
-        status_color = "yellow"
+        status_color = "#FFD700"
+        status_icon = "⚠️"
     
     edge = match.get('edge', 0)
     edge_symbol = "+" if edge > 0 else ""
-    edge_color = "green" if edge > 0 else "red"
+    edge_color = "#00FF88" if edge > 0 else "#FF4444"
     prob = match.get('prob', 50)
     
-    with st.container():
-        st.markdown("<hr>", unsafe_allow_html=True)
-        
-        # Row 1: League, status, time
-        c1, c2, c3 = st.columns([2, 1, 1])
-        with c1:
-            st.markdown(f"<span style='font-size: 0.65rem; color: #FFD700;'>🏆 {match.get('league', '?')} • Tier {match.get('tier', '?')}</span>", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<span style='font-size: 0.65rem; color: #888;'>🕐 {match.get('time', 'TBD')}</span>", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"<span style='font-size: 0.65rem; color: {status_color}; text-align: right;'>{status_label}</span>", unsafe_allow_html=True)
-        
-        # Row 2: Teams
-        st.markdown(f"<span style='font-size: 0.85rem; font-weight: 500;'>{match.get('home', '?')} vs {match.get('away', '?')}</span>", unsafe_allow_html=True)
-        st.markdown(f"<span style='font-size: 0.6rem; color: #666;'>📍 {match.get('venue', 'TBD')}</span>", unsafe_allow_html=True)
-        
-        # Row 3: Odds
-        o1, o2, o3, o4, o5 = st.columns([1, 1, 1, 1, 1.3])
-        with o1:
-            st.markdown(f"<span style='font-size: 0.55rem; color: #666;'>HOME</span><br><span style='font-size: 0.85rem; font-weight: 600; color: #FFD700;'>{match.get('home_odds', 0):.2f}</span>", unsafe_allow_html=True)
-        with o2:
-            st.markdown(f"<span style='font-size: 0.55rem; color: #666;'>DRAW</span><br><span style='font-size: 0.85rem; font-weight: 600; color: #FFD700;'>{match.get('draw_odds', 0):.2f}</span>", unsafe_allow_html=True)
-        with o3:
-            st.markdown(f"<span style='font-size: 0.55rem; color: #666;'>AWAY</span><br><span style='font-size: 0.85rem; font-weight: 600; color: #FFD700;'>{match.get('away_odds', 0):.2f}</span>", unsafe_allow_html=True)
-        with o4:
-            st.markdown(f"<span style='font-size: 0.55rem; color: #666;'>EDGE</span><br><span style='font-size: 0.85rem; font-weight: 600; color: {edge_color};'>{edge_symbol}{edge:.1f}%</span>", unsafe_allow_html=True)
-        with o5:
-            st.markdown(f"<span style='font-size: 0.55rem; color: #666;'>🎯 {match.get('selection', '?')}</span><br><span style='font-size: 0.8rem; font-weight: 500;'>@{match.get('selection_odds', 0):.2f}</span>", unsafe_allow_html=True)
-        
-        # Row 4: Probability
-        st.markdown(f"<span style='font-size: 0.55rem; color: #666;'>Model Prob: {prob}%</span>", unsafe_allow_html=True)
-        st.progress(prob / 100)
-        
-        # Row 5: Button
-        if st.button(f"🔍 View", key=f"view_{match.get('id', 0)}", use_container_width=True):
+    # Single line - 8 columns
+    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.8, 2.2, 0.8, 0.8, 0.8, 0.8, 1, 0.8])
+    
+    with c1:
+        st.markdown(f"<span style='font-size: 0.7rem; color: #FFD700;'>🏆{match.get('tier', '?')}</span>", unsafe_allow_html=True)
+    
+    with c2:
+        home_short = match.get('home', '?')[:12]
+        away_short = match.get('away', '?')[:12]
+        st.markdown(f"<span style='font-size: 0.75rem; font-weight: 500;'>{home_short} vs {away_short}</span>", unsafe_allow_html=True)
+    
+    with c3:
+        st.markdown(f"<span style='font-size: 0.65rem; color: #888;'>{match.get('time', 'TBD')}</span>", unsafe_allow_html=True)
+    
+    with c4:
+        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: #FFD700;'>{match.get('home_odds', 0):.2f}</span>", unsafe_allow_html=True)
+    
+    with c5:
+        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: #FFD700;'>{match.get('draw_odds', 0):.2f}</span>", unsafe_allow_html=True)
+    
+    with c6:
+        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: #FFD700;'>{match.get('away_odds', 0):.2f}</span>", unsafe_allow_html=True)
+    
+    with c7:
+        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: {edge_color};'>{edge_symbol}{edge:.1f}%</span><br><span style='font-size: 0.55rem; color: #666;'>{prob}%</span>", unsafe_allow_html=True)
+    
+    with c8:
+        st.markdown(f"<span style='font-size: 0.9rem; color: {status_color};'>{status_icon}</span>", unsafe_allow_html=True)
+        if st.button("🔍", key=f"view_{match.get('id', 0)}", help="View Analysis"):
             navigate_to("match_detail", match)
+    
+    st.markdown("<hr>", unsafe_allow_html=True)
 
 # ========== LEG DATA TAB ==========
 def show_leg_data(match, fdata):
@@ -337,11 +235,9 @@ def show_leg_data(match, fdata):
     with c1:
         st.markdown(f"**{match.get('home', 'Home')} Form**")
         st.code(leg_data.get('home_form', '?'), language="text")
-        st.caption(f"Position: {leg_data.get('home_position', '?')} | Points: {leg_data.get('home_points', 0)}")
     with c2:
         st.markdown(f"**{match.get('away', 'Away')} Form**")
         st.code(leg_data.get('away_form', '?'), language="text")
-        st.caption(f"Position: {leg_data.get('away_position', '?')} | Points: {leg_data.get('away_points', 0)}")
     
     st.divider()
     st.markdown("### 📜 Head-to-Head Record")
@@ -363,10 +259,8 @@ def show_forensic_tab(match, fdata):
     c1, c2 = st.columns(2)
     with c1:
         st.metric(f"{match.get('home', 'Home')}", "82/100", "Healthy")
-        st.write("Injuries: None")
     with c2:
         st.metric(f"{match.get('away', 'Away')}", "65/100", "1 injury")
-        st.write("Injuries: 1 (midfielder)")
     
     st.markdown("### M7: AI Consensus")
     st.dataframe(pd.DataFrame([
@@ -456,7 +350,7 @@ def show_dashboard():
     for match in MATCHES:
         show_match_card(match)
     
-    st.caption("© 2025 Match Oracle • AI-powered football intelligence")
+    st.caption("© 2025 Match Oracle")
 
 # ========== OTHER PAGES ==========
 def show_performance():
