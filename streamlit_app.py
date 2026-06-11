@@ -40,7 +40,7 @@ MOCK_FIXTURES = [
     {"id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "league": "League of Ireland", "time": "19:45", "odds": 1.33, "status": "NS", "prob": 68, "edge": -7.2, "confidence": "HIGH", "selection": "Shamrock Rovers"},
     {"id": 4, "home": "Treaty United", "away": "Bray Wanderers", "league": "League of Ireland", "time": "19:45", "odds": 1.79, "status": "NS", "prob": 54, "edge": -1.9, "confidence": "MEDIUM", "selection": "Bray Wanderers"},
     {"id": 5, "home": "Finn Harps", "away": "UCD Dublin", "league": "League of Ireland", "time": "19:45", "odds": 1.85, "status": "NS", "prob": 53, "edge": -1.1, "confidence": "MEDIUM", "selection": "UCD Dublin"},
-    {"id": 6, "home": "Waterford", "away": "Sligo Rovers", "league": "League of Ireland", "time": "19:45", "odds": 2.50, "status": "NS", "prob": 36, "edge": 3.2, "confidence": "LOW", "selection": "Sligo Rovers"},
+    {"id": 6, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "time": "15:00", "odds": 1.85, "status": "NS", "prob": 57, "edge": 5.1, "confidence": "HIGH", "selection": "Ajax"},
 ]
 
 # Mock forensic data for each fixture
@@ -54,8 +54,8 @@ FORENSIC_DATA = {
         "stake": 33.50, "bankroll": 1000,
         "reason": "Clear value: model 62% vs implied 58%",
         "h2h_conflict": False,
-        "current_season_wr": 45, "h2h_wr": 38,
         "kelly_raw": 0.085, "kelly_adj": 0.0335,
+        "selection": "Cork City",
     },
     2: {  # Derry vs Bohemians (CONFLICT REJECT)
         "status": "REJECTED",
@@ -68,6 +68,7 @@ FORENSIC_DATA = {
         "h2h_conflict": True,
         "current_season_wr": 45, "h2h_wr": 46,
         "conflict_details": "H2H history (80+ matches): Derry 46% wins | Current season: Bohemians 45% WR",
+        "selection": "Bohemians FC",
     },
     3: {  # Shamrock vs Shelbourne (NEGATIVE EDGE)
         "status": "REJECTED",
@@ -78,6 +79,38 @@ FORENSIC_DATA = {
         "stake": 0, "bankroll": 1000,
         "reason": "Negative edge: model 68% vs market 75% (implied)",
         "h2h_conflict": False,
+        "selection": "Shamrock Rovers",
+    },
+    4: {  # Treaty vs Bray (NEGATIVE EDGE)
+        "status": "REJECTED",
+        "m4_passed": True, "m4_checks": 6, "m4_total": 8,
+        "m5_score": 2.5, "m5_threshold": 4.5,
+        "m8_conflict": False,
+        "edge": -1.9, "prob": 54, "odds": 1.79,
+        "stake": 0, "bankroll": 1000,
+        "reason": "Negative edge: model 54% vs market 56%",
+        "selection": "Bray Wanderers",
+    },
+    5: {  # Finn Harps vs UCD (NEGATIVE EDGE)
+        "status": "REJECTED",
+        "m4_passed": True, "m4_checks": 6, "m4_total": 8,
+        "m5_score": 2.5, "m5_threshold": 4.5,
+        "m8_conflict": False,
+        "edge": -1.1, "prob": 53, "odds": 1.85,
+        "stake": 0, "bankroll": 1000,
+        "reason": "Negative edge: model 53% vs market 54%",
+        "selection": "UCD Dublin",
+    },
+    6: {  # Ajax vs Feyenoord (APPROVED)
+        "status": "APPROVED",
+        "m4_passed": True, "m4_checks": 7, "m4_total": 8,
+        "m5_score": 1.8, "m5_threshold": 4.5,
+        "m8_conflict": False,
+        "edge": 5.1, "prob": 57, "odds": 1.85,
+        "stake": 28.50, "bankroll": 1000,
+        "reason": "Clear value: model 57% vs implied 54%",
+        "h2h_conflict": False,
+        "selection": "Ajax",
     },
 }
 
@@ -120,14 +153,35 @@ def navigate_to(page):
 def go_back():
     navigate_to("dashboard")
 
+def safe_get(data, key, default="?"):
+    """Safely get value from dict"""
+    if data is None:
+        return default
+    return data.get(key, default)
+
 # ========== FORENSIC REPORT PAGE (DETAILED) ==========
 def show_forensic_report(fixture):
-    fid = fixture['id']
+    if fixture is None:
+        st.error("No fixture selected")
+        if st.button("← Back"):
+            go_back()
+        return
+    
+    fid = safe_get(fixture, 'id', 0)
     fdata = FORENSIC_DATA.get(fid, {})
     
+    # Safe extraction of fixture data
+    home = safe_get(fixture, 'home', '?')
+    away = safe_get(fixture, 'away', '?')
+    league = safe_get(fixture, 'league', '?')
+    time = safe_get(fixture, 'time', 'TBD')
+    odds = safe_get(fixture, 'odds', 0.0)
+    selection = safe_get(fixture, 'selection', safe_get(fdata, 'selection', '?'))
+    confidence = safe_get(fixture, 'confidence', 'MEDIUM')
+    
     # Header
-    st.title(f"🔬 {fixture['home']} vs {fixture['away']}")
-    st.caption(f"{fixture['league']} | Kickoff: {fixture['time']} | Selection: {fixture['selection']} @ {fixture['odds']:.2f}")
+    st.title(f"🔬 {home} vs {away}")
+    st.caption(f"{league} | Kickoff: {time} | Selection: {selection} @ {odds:.2f}")
     
     if st.button("← Back to Fixtures"):
         go_back()
@@ -135,11 +189,12 @@ def show_forensic_report(fixture):
     st.divider()
     
     # Status Banner
-    if fdata.get("status") == "APPROVED":
+    status = safe_get(fdata, 'status', 'PENDING')
+    if status == "APPROVED":
         st.success("✅ QUALIFIED - RECOMMENDED BET")
-    elif fdata.get("m8_conflict"):
+    elif safe_get(fdata, 'm8_conflict', False):
         st.error("🚨 H2H CONFLICT DETECTED - HARD REJECT")
-    elif fdata.get("edge", 0) < 0:
+    elif safe_get(fdata, 'edge', 0) < 0:
         st.warning("⚠️ REJECTED - Negative Edge (No Value)")
     else:
         st.info("ℹ️ PENDING REVIEW")
@@ -148,9 +203,9 @@ def show_forensic_report(fixture):
     
     # ===== MODULE 4: PRE-FILTER =====
     st.markdown("### M4: Asymmetric Pre-filter (8 Checks)")
-    m4_passed = fdata.get("m4_passed", False)
-    m4_checks = fdata.get("m4_checks", 0)
-    m4_total = fdata.get("m4_total", 8)
+    m4_passed = safe_get(fdata, 'm4_passed', False)
+    m4_checks = safe_get(fdata, 'm4_checks', 0)
+    m4_total = safe_get(fdata, 'm4_total', 8)
     
     checks = [
         {"name": "C1: Season Win Gap", "passed": True, "value": 14, "threshold": 3},
@@ -190,8 +245,8 @@ def show_forensic_report(fixture):
         with col2:
             st.write(f"+{f['points']} pts")
     
-    m5_score = fdata.get("m5_score", 0)
-    m5_threshold = fdata.get("m5_threshold", 4.5)
+    m5_score = safe_get(fdata, 'm5_score', 0)
+    m5_threshold = safe_get(fdata, 'm5_threshold', 4.5)
     st.markdown(f"**Total Failure Score:** {m5_score} / {m5_threshold} → {'✅ PASS' if m5_score < m5_threshold else '❌ FAIL'}")
     
     st.divider()
@@ -200,12 +255,12 @@ def show_forensic_report(fixture):
     st.markdown("### M6: Personnel Forensics")
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"**{fixture['home']}**")
+        st.markdown(f"**{home}**")
         st.metric("Personnel Score", "82/100", "Healthy")
         st.write("Key injuries: None")
         st.write("Fatigue: LOW")
     with col2:
-        st.markdown(f"**{fixture['away']}**")
+        st.markdown(f"**{away}**")
         st.metric("Personnel Score", "65/100", "1 injury")
         st.write("Key injuries: 1 (midfielder)")
         st.write("Fatigue: MEDIUM")
@@ -228,17 +283,17 @@ def show_forensic_report(fixture):
     # ===== MODULE 8: DUAL PATTERN (CONFLICT DETECTION) =====
     st.markdown("### M8: Dual Pattern Engine")
     
-    if fdata.get("h2h_conflict", False):
+    if safe_get(fdata, 'h2h_conflict', False):
         st.error("🚨 H2H CONFLICT DETECTED - HARD REJECT")
         st.markdown(f"""
         **H2H HISTORY (80+ matches):**
-        - {fixture['home']}: {fdata.get('h2h_wr', 46)}% wins
+        - {home}: {safe_get(fdata, 'h2h_wr', 46)}% wins
         - Draws: 30%
-        - {fixture['away']}: {100 - fdata.get('h2h_wr', 46) - 30}% wins
+        - {away}: {100 - safe_get(fdata, 'h2h_wr', 46) - 30}% wins
         
         **CURRENT SEASON (20 matches):**
-        - {fixture['home']}: 20% wins, 6th place
-        - {fixture['away']}: {fdata.get('current_season_wr', 45)}% wins, 2nd place
+        - {home}: 20% wins, 6th place
+        - {away}: {safe_get(fdata, 'current_season_wr', 45)}% wins, 2nd place
         
         **CONFLICT:** H2H and current season directly contradict each other.
         
@@ -259,7 +314,7 @@ def show_forensic_report(fixture):
     st.markdown("### M9: Underdog Scanner")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Underdog Edge", f"{fdata.get('edge', 0):+.1f}%")
+        st.metric("Underdog Edge", f"{safe_get(fdata, 'edge', 0):+.1f}%")
         st.metric("Threat Level", "LOW")
     with col2:
         st.metric("Pattern Score", "22/100")
@@ -315,54 +370,57 @@ def show_forensic_report(fixture):
     # ===== FINAL VERDICT & STAKE =====
     st.markdown("### ✅ FINAL VERDICT")
     
-    if fdata.get("status") == "APPROVED":
-        stake = fdata.get("stake", 0)
-        bankroll = fdata.get("bankroll", 1000)
-        stake_pct = (stake / bankroll) * 100 if bankroll > 0 else 0
-        
+    edge = safe_get(fdata, 'edge', 0)
+    prob = safe_get(fdata, 'prob', safe_get(fixture, 'prob', 50))
+    stake = safe_get(fdata, 'stake', 0)
+    bankroll = safe_get(fdata, 'bankroll', 1000)
+    stake_pct = (stake / bankroll) * 100 if bankroll > 0 else 0
+    
+    if status == "APPROVED":
         st.success(f"""
         **STATUS: APPROVED**
-        - Confidence: {fixture['confidence']}
-        - Edge: +{fdata.get('edge', 0)}%
-        - Model Probability: {fdata.get('prob', 0)}%
+        - Confidence: {confidence}
+        - Edge: +{edge}%
+        - Model Probability: {prob}%
         - Kelly Stake: £{stake:.2f} ({stake_pct:.2f}% of bankroll)
-        - Potential Return: £{stake * fixture['odds']:.2f}
-        - Potential Profit: £{stake * (fixture['odds'] - 1):.2f}
+        - Potential Return: £{stake * odds:.2f}
+        - Potential Profit: £{stake * (odds - 1):.2f}
         """)
-    elif fdata.get("m8_conflict"):
+    elif safe_get(fdata, 'm8_conflict', False):
         st.error(f"""
         **STATUS: REJECTED (H2H CONFLICT)**
-        - Edge: +{fdata.get('edge', 0)}% (would be value)
-        - Model Probability: {fdata.get('prob', 0)}%
-        - Odds: {fixture['odds']:.2f}
+        - Edge: +{edge}% (would be value)
+        - Model Probability: {prob}%
+        - Odds: {odds:.2f}
         
-        **Reason:** {fdata.get('reason', 'H2H vs current season contradiction')}
+        **Reason:** {safe_get(fdata, 'reason', 'H2H vs current season contradiction')}
         
         **M8 v6 Rule:** Conflict = HARD REJECT (stake multiplier = 0.0)
         """)
-    elif fdata.get("edge", 0) < 0:
+    elif edge < 0:
+        implied = (1/odds * 100) if odds > 0 else 0
         st.warning(f"""
         **STATUS: REJECTED (Negative Edge)**
-        - Model Probability: {fdata.get('prob', 0)}%
-        - Implied Probability: {(1/fixture['odds'] * 100):.1f}%
-        - Edge: {fdata.get('edge', 0):+.1f}%
+        - Model Probability: {prob}%
+        - Implied Probability: {implied:.1f}%
+        - Edge: {edge:+.1f}%
         
-        **Reason:** Model says {fdata.get('prob', 0)}%, market says {(1/fixture['odds'] * 100):.1f}%. No value.
+        **Reason:** Model says {prob}%, market says {implied:.1f}%. No value.
         """)
     else:
-        st.info(f"**STATUS: {fdata.get('status', 'PENDING')}**")
+        st.info(f"**STATUS: {status}**")
     
     st.divider()
     
     # ===== KELLY CALCULATION DETAILS =====
-    if fdata.get("status") == "APPROVED":
+    if status == "APPROVED":
         st.markdown("### 📊 Kelly Calculation")
         st.markdown(f"""
-        - Raw Kelly Fraction: {fdata.get('kelly_raw', 0.085)*100:.2f}%
-        - Confidence Scaling: {fdata.get('confidence', 'HIGH')} → 50% of Kelly
-        - Adjusted Kelly: {fdata.get('kelly_adj', 0.0335)*100:.2f}%
-        - Bankroll: £{fdata.get('bankroll', 1000):.0f}
-        - Final Stake: **£{fdata.get('stake', 0):.2f}**
+        - Raw Kelly Fraction: {safe_get(fdata, 'kelly_raw', 0.085)*100:.2f}%
+        - Confidence Scaling: {confidence} → 50% of Kelly
+        - Adjusted Kelly: {safe_get(fdata, 'kelly_adj', 0.0335)*100:.2f}%
+        - Bankroll: £{bankroll:.0f}
+        - Final Stake: **£{stake:.2f}**
         """)
 
 # ========== DASHBOARD PAGE ==========
@@ -379,68 +437,73 @@ def show_dashboard():
     st.divider()
     
     # Group fixtures by league
-    st.subheader("🏆 League of Ireland")
-    
+    leagues = {}
     for fixture in MOCK_FIXTURES:
-        # Determine status color/icon
-        fid = fixture['id']
-        fdata = FORENSIC_DATA.get(fid, {})
+        league = fixture.get('league', 'Unknown')
+        if league not in leagues:
+            leagues[league] = []
+        leagues[league].append(fixture)
+    
+    for league, fixtures in leagues.items():
+        st.subheader(f"🏆 {league}")
         
-        if fdata.get("status") == "APPROVED":
-            status_icon = "✅"
-            status_color = "green"
-        elif fdata.get("m8_conflict"):
-            status_icon = "🚨"
-            status_color = "red"
-        elif fdata.get("edge", 0) < 0:
-            status_icon = "⚠️"
-            status_color = "orange"
-        else:
-            status_icon = "❓"
-            status_color = "gray"
-        
-        col1, col2, col3, col4, col5, col6 = st.columns([2.5, 1, 0.8, 0.8, 1, 0.8])
-        
-        with col1:
-            st.markdown(f"**{status_icon} {fixture['home']} vs {fixture['away']}**")
-        with col2:
-            st.write(fixture['time'])
-        with col3:
-            st.write(f"{fixture['odds']:.2f}")
-        with col4:
-            edge = fixture.get('edge', 0)
-            edge_color = "🟢" if edge > 0 else "🔴" if edge < 0 else "⚪"
-            st.write(f"{edge_color} {abs(edge):.1f}%")
-        with col5:
-            st.write(f"{fixture['prob']}%")
-        with col6:
-            if st.button("🔍", key=f"btn_{fixture['id']}", help="View forensic report"):
-                st.session_state.selected_fixture = fixture
-                navigate_to("forensic")
-        st.divider()
+        for fixture in fixtures:
+            fid = fixture.get('id', 0)
+            fdata = FORENSIC_DATA.get(fid, {})
+            status = fdata.get('status', 'PENDING')
+            
+            if status == "APPROVED":
+                status_icon = "✅"
+            elif fdata.get('m8_conflict', False):
+                status_icon = "🚨"
+            elif fdata.get('edge', 0) < 0:
+                status_icon = "⚠️"
+            else:
+                status_icon = "❓"
+            
+            col1, col2, col3, col4, col5, col6 = st.columns([2.5, 1, 0.8, 0.8, 1, 0.8])
+            
+            with col1:
+                st.markdown(f"**{status_icon} {fixture.get('home', '?')} vs {fixture.get('away', '?')}**")
+            with col2:
+                st.write(fixture.get('time', 'TBD'))
+            with col3:
+                st.write(f"{fixture.get('odds', 0):.2f}")
+            with col4:
+                edge = fixture.get('edge', 0)
+                edge_color = "🟢" if edge > 0 else "🔴" if edge < 0 else "⚪"
+                st.write(f"{edge_color} {abs(edge):.1f}%")
+            with col5:
+                st.write(f"{fixture.get('prob', 0)}%")
+            with col6:
+                if st.button("🔍", key=f"btn_{fixture.get('id', 0)}", help="View forensic report"):
+                    st.session_state.selected_fixture = fixture
+                    navigate_to("forensic")
+            st.divider()
     
     # Top Picks Summary
     st.subheader("🏆 Top Picks (Ranked)")
-    approved_fixtures = [f for f in MOCK_FIXTURES if FORENSIC_DATA.get(f['id'], {}).get("status") == "APPROVED"]
+    approved_fixtures = [f for f in MOCK_FIXTURES if FORENSIC_DATA.get(f.get('id', 0), {}).get("status") == "APPROVED"]
     
     if approved_fixtures:
         for i, fixture in enumerate(approved_fixtures, 1):
-            fdata = FORENSIC_DATA.get(fixture['id'], {})
+            fid = fixture.get('id', 0)
+            fdata = FORENSIC_DATA.get(fid, {})
             stake = fdata.get('stake', 0)
             col1, col2, col3, col4 = st.columns([2, 1, 1, 1.5])
             with col1:
-                st.write(f"**#{i} {fixture['home']} vs {fixture['away']}**")
+                st.write(f"**#{i} {fixture.get('home', '?')} vs {fixture.get('away', '?')}**")
             with col2:
-                st.write(f"{fixture['selection']} @ {fixture['odds']:.2f}")
+                st.write(f"{fixture.get('selection', '?')} @ {fixture.get('odds', 0):.2f}")
             with col3:
-                st.write(f"{fixture['prob']}% prob")
+                st.write(f"{fixture.get('prob', 0)}% prob")
             with col4:
                 st.write(f"Stake: £{stake:.2f}")
             st.divider()
     else:
         st.info("No approved picks for today")
 
-# ========== OTHER PAGES (simplified for brevity) ==========
+# ========== OTHER PAGES ==========
 def show_performance():
     st.title("📈 Performance Metrics")
     if st.button("← Back"):
@@ -463,9 +526,9 @@ def show_top_picks():
         navigate_to("dashboard")
     st.divider()
     for fixture in MOCK_FIXTURES:
-        fdata = FORENSIC_DATA.get(fixture['id'], {})
+        fdata = FORENSIC_DATA.get(fixture.get('id', 0), {})
         if fdata.get("status") == "APPROVED":
-            st.write(f"**{fixture['home']} vs {fixture['away']}** - {fixture['selection']} @ {fixture['odds']:.2f}")
+            st.write(f"**{fixture.get('home', '?')} vs {fixture.get('away', '?')}** - {fixture.get('selection', '?')} @ {fixture.get('odds', 0):.2f}")
 
 def show_parlays():
     st.title("🔗 Parlay Builder")
@@ -480,7 +543,7 @@ def show_all_legs():
         navigate_to("dashboard")
     st.divider()
     for fixture in MOCK_FIXTURES:
-        st.write(f"{fixture['home']} vs {fixture['away']} - {fixture['league']} - {fixture['time']}")
+        st.write(f"{fixture.get('home', '?')} vs {fixture.get('away', '?')} - {fixture.get('league', '?')} - {fixture.get('time', 'TBD')}")
 
 def show_countries():
     st.title("🌍 Country Explorer")
@@ -516,7 +579,6 @@ def main():
         st.markdown("### 🎯 MATCH ORACLE")
         st.markdown("---")
         
-        # Backend Status
         if st.session_state.backend_status == "connected":
             st.success("🟢 BACKEND ONLINE")
         else:
@@ -524,7 +586,6 @@ def main():
         
         st.markdown("---")
         
-        # Menu
         st.markdown("**📋 TODAY**")
         if st.button("🏠 Today's Fixtures", use_container_width=True):
             navigate_to("dashboard")
@@ -554,7 +615,6 @@ def main():
         st.markdown("---")
         st.caption(f"🕐 {datetime.now().strftime('%H:%M:%S')} GMT+3")
     
-    # Page routing
     page = st.session_state.page
     if page == "dashboard":
         show_dashboard()
