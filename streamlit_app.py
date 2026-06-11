@@ -24,17 +24,20 @@ st.markdown("""
         background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 100%);
     }
     .gold-header {
-        font-size: 1.8rem;
+        font-size: 2.2rem;
         font-weight: 800;
         background: linear-gradient(135deg, #FFD700, #FFA500);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0;
+        margin-top: -1rem;
+        padding-top: 0;
     }
     .gold-subheader {
-        font-size: 0.8rem;
+        font-size: 1rem;
         color: #B8860B;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
+        margin-top: 0;
         border-left: 3px solid #FFD700;
         padding-left: 1rem;
     }
@@ -42,23 +45,44 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     hr {
-        margin: 0.1rem 0;
+        margin: 0.15rem 0;
         border-color: #2a2a2a;
     }
     .stButton button {
-        padding: 0rem 0.2rem;
+        padding: 0rem 0.3rem;
         min-height: 0px;
-        font-size: 0.6rem;
+        font-size: 0.75rem;
     }
     div[data-testid="column"] {
-        padding: 0 0.1rem;
+        padding: 0 0.15rem;
+    }
+    /* Increase font sizes by 25% */
+    .match-text {
+        font-size: 0.94rem !important;
+    }
+    .odds-text {
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+    }
+    .time-text {
+        font-size: 0.81rem !important;
+    }
+    .edge-text {
+        font-size: 0.88rem !important;
+        font-weight: 600 !important;
+    }
+    .prob-text {
+        font-size: 0.69rem !important;
+    }
+    .tier-text {
+        font-size: 0.88rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== LIVE CLOCK ==========
+# ========== LIVE CLOCK (Top Right) ==========
 st.markdown("""
-<div id="live-clock" style="position: fixed; top: 5px; right: 15px; color: #FFD700; font-family: monospace; font-size: 0.7rem; z-index: 999;"></div>
+<div id="live-clock" style="position: fixed; top: 8px; right: 20px; color: #FFD700; font-family: monospace; font-size: 0.85rem; z-index: 999;"></div>
 <script>
 function updateClock() {
     const now = new Date();
@@ -255,7 +279,7 @@ def navigate_to(page, match=None):
 def go_back():
     navigate_to("dashboard")
 
-# ========== COMPACT MATCH CARD ==========
+# ========== COMPACT MATCH CARD (Increased Fonts by 25%) ==========
 def show_match_card(match):
     fid = match.get("id", 0)
     fdata = FORENSIC_DATA.get(fid, {})
@@ -280,36 +304,36 @@ def show_match_card(match):
     edge_color = "#00FF88" if edge > 0 else "#FF4444"
     prob = match.get("prob", 50)
     
-    # Single line using columns
-    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.6, 2.2, 0.8, 0.8, 0.8, 0.8, 1, 0.7])
+    # Single line using columns - fonts increased by 25%
+    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([0.6, 2.2, 0.9, 0.9, 0.9, 0.9, 1.1, 0.8])
     
     with c1:
-        st.markdown(f"<span style='font-size: 0.7rem; color: #FFD700;'>{match.get('tier', '?')}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.88rem; color: #FFD700;'>{match.get('tier', '?')}</span>", unsafe_allow_html=True)
     
     with c2:
-        home_short = match.get("home", "?")[:12]
-        away_short = match.get("away", "?")[:12]
-        st.markdown(f"<span style='font-size: 0.75rem;'>{home_short} vs {away_short}</span>", unsafe_allow_html=True)
+        home_short = match.get("home", "?")[:14]
+        away_short = match.get("away", "?")[:14]
+        st.markdown(f"<span style='font-size: 0.94rem; font-weight: 500;'>{home_short} vs {away_short}</span>", unsafe_allow_html=True)
     
     with c3:
-        st.markdown(f"<span style='font-size: 0.65rem; color: #888;'>{match.get('time', 'TBD')}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.81rem; color: #888;'>{match.get('time', 'TBD')}</span>", unsafe_allow_html=True)
     
     with c4:
-        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: #FFD700;'>{match.get('home_odds', 0):.2f}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.88rem; font-weight: 600; color: #FFD700;'>{match.get('home_odds', 0):.2f}</span>", unsafe_allow_html=True)
     
     with c5:
-        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: #FFD700;'>{match.get('draw_odds', 0):.2f}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.88rem; font-weight: 600; color: #FFD700;'>{match.get('draw_odds', 0):.2f}</span>", unsafe_allow_html=True)
     
     with c6:
-        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: #FFD700;'>{match.get('away_odds', 0):.2f}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.88rem; font-weight: 600; color: #FFD700;'>{match.get('away_odds', 0):.2f}</span>", unsafe_allow_html=True)
     
     with c7:
-        st.markdown(f"<span style='font-size: 0.7rem; font-weight: 600; color: {edge_color};'>{edge_symbol}{edge:.1f}%</span> <span style='font-size: 0.55rem; color: #666;'>{prob}%</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.88rem; font-weight: 600; color: {edge_color};'>{edge_symbol}{edge:.1f}%</span> <span style='font-size: 0.69rem; color: #666;'>{prob}%</span>", unsafe_allow_html=True)
     
     with c8:
         col_a, col_b = st.columns([0.5, 0.5])
         with col_a:
-            st.markdown(f"<span style='font-size: 0.8rem; color: {status_color};'>{status_icon}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-size: 1rem; color: {status_color};'>{status_icon}</span>", unsafe_allow_html=True)
         with col_b:
             if st.button("🔍", key=f"view_{match.get('id', 0)}", help="View Analysis"):
                 navigate_to("match_detail", match)
@@ -437,8 +461,11 @@ def show_match_detail():
 
 # ========== DASHBOARD ==========
 def show_dashboard():
+    # Top padding reduced - headline moved up
+    st.markdown('<div style="margin-top: -1rem;">', unsafe_allow_html=True)
     st.markdown('<p class="gold-header">MATCH ORACLE</p>', unsafe_allow_html=True)
     st.markdown('<p class="gold-subheader">AI-Powered Football Intelligence</p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
     if st.session_state.backend_status == "connected":
         st.success("BACKEND ONLINE")
