@@ -1,548 +1,798 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-from datetime import datetime
-import requests
-import os
-import pytz
-
-# ========== PAGE CONFIGURATION ==========
-st.set_page_config(
-    page_title="Match Oracle",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# ========== TIMEZONE ==========
-NAIROBI_TZ = pytz.timezone('Africa/Nairobi')
-
-# ========== BLACK/GOLD THEME CSS ==========
-st.markdown("""
-<style>
-    .stApp {
-        background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 100%);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match Oracle - Football Intelligence</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 100%);
+      color: #e0e0e0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+    
+    /* Sidebar - Black/Dark theme */
+    .sidebar {
+      width: 280px;
+      background: #0a0a0a;
+      border-right: 1px solid #2a2a2a;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 20px;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+    
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 5px;
+    }
+    
+    .logo span {
+      font-size: 0.7rem;
+      color: #B8860B;
+      font-weight: normal;
+      display: block;
+    }
+    
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #FFD700;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+    
+    select, input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 0.8rem;
+      margin-bottom: 8px;
+    }
+    
+    select:focus, input:focus {
+      outline: none;
+      border-color: #FFD700;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      width: 100%;
+    }
+    
+    button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    /* Quick leagues */
+    .quick-leagues {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .league-btn {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .league-btn:hover {
+      background: #FFD700;
+      color: #000;
+      border-color: #FFD700;
+    }
+    
+    .league-btn.active {
+      background: #FFD700;
+      color: #000;
+      border-color: #FFD700;
+    }
+    
+    /* Main content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     
     .main-header {
-        font-size: 2.5rem;
-        font-weight: 800;
-        background: linear-gradient(135deg, #FFD700, #FFA500);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-top: -30px;
-        margin-bottom: 0;
-        padding-top: 0;
+      background: #0a0a0a;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     
-    .sub-header {
-        font-size: 1rem;
-        color: #B8860B;
-        margin-top: -10px;
-        margin-bottom: 15px;
-        border-left: 3px solid #FFD700;
-        padding-left: 1rem;
+    .header-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #FFD700, #FFA500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    hr {
-        margin: 2px 0;
-        border-color: #2a2a2a;
+    .header-subtitle {
+      font-size: 0.7rem;
+      color: #B8860B;
     }
     
-    div[data-testid="column"] {
-        padding: 0 2px;
+    /* Summary cards */
+    .summary-bar {
+      background: #0a0a0a;
+      border-bottom: 1px solid #2a2a2a;
+      padding: 12px 24px;
+      display: flex;
+      gap: 16px;
     }
     
-    /* Make entire row clickable */
-    .clickable-row {
-        cursor: pointer;
-        transition: background-color 0.2s;
+    .summary-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 12px 20px;
+      min-width: 100px;
+      text-align: center;
     }
-    .clickable-row:hover {
-        background-color: #1a1a1a;
+    
+    .summary-card .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #FFD700;
     }
-</style>
-""", unsafe_allow_html=True)
+    
+    .summary-card .label {
+      font-size: 0.7rem;
+      color: #888;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    
+    .summary-card.approved .value { color: #00FF88; }
+    .summary-card.rejected .value { color: #FF4444; }
+    .summary-card.caution .value { color: #FFA500; }
+    
+    /* Content area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+    
+    /* League tabs */
+    .league-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    
+    .league-tab {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .league-tab:hover {
+      background: #2a2a2a;
+    }
+    
+    .league-tab.active {
+      background: #FFD700;
+      color: #000;
+      border-color: #FFD700;
+    }
+    
+    /* Match card */
+    .match-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    
+    .match-card:hover {
+      border-color: #FFD700;
+    }
+    
+    .match-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      gap: 16px;
+      cursor: pointer;
+    }
+    
+    .match-row:hover {
+      background: rgba(255, 215, 0, 0.05);
+    }
+    
+    .match-teams {
+      flex: 2;
+      min-width: 0;
+    }
+    
+    .match-teams .teams {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    
+    .match-teams .meta {
+      font-size: 0.65rem;
+      color: #666;
+      margin-top: 2px;
+    }
+    
+    .match-odds {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .odd-box {
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 4px 8px;
+      text-align: center;
+      min-width: 50px;
+    }
+    
+    .odd-label {
+      font-size: 0.55rem;
+      color: #666;
+    }
+    
+    .odd-value {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #FFD700;
+    }
+    
+    .verdict-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      min-width: 80px;
+      text-align: center;
+    }
+    
+    .verdict-APPROVED {
+      background: rgba(0, 255, 136, 0.15);
+      color: #00FF88;
+      border: 1px solid rgba(0, 255, 136, 0.3);
+    }
+    
+    .verdict-REJECTED {
+      background: rgba(255, 68, 68, 0.15);
+      color: #FF4444;
+      border: 1px solid rgba(255, 68, 68, 0.3);
+    }
+    
+    .verdict-CAUTION {
+      background: rgba(255, 165, 0, 0.15);
+      color: #FFA500;
+      border: 1px solid rgba(255, 165, 0, 0.3);
+    }
+    
+    .match-prob, .match-edge {
+      text-align: center;
+      min-width: 60px;
+    }
+    
+    .prob-label, .edge-label {
+      font-size: 0.55rem;
+      color: #666;
+    }
+    
+    .match-prob .value {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #FFD700;
+    }
+    
+    .match-edge .value {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .match-edge .positive { color: #00FF88; }
+    .match-edge .negative { color: #FF4444; }
+    
+    /* Detail panel */
+    .match-detail {
+      display: none;
+      background: #0f0f0f;
+      border-top: 1px solid #2a2a2a;
+      padding: 16px;
+    }
+    
+    .match-detail.show {
+      display: block;
+    }
+    
+    .detail-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #2a2a2a;
+      padding-bottom: 8px;
+    }
+    
+    .detail-tab {
+      padding: 6px 16px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    
+    .detail-tab:hover {
+      background: #2a2a2a;
+    }
+    
+    .detail-tab.active {
+      background: #FFD700;
+      color: #000;
+    }
+    
+    .detail-content {
+      display: none;
+    }
+    
+    .detail-content.active {
+      display: block;
+    }
+    
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    
+    .detail-item {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    
+    .detail-item .label {
+      font-size: 0.6rem;
+      color: #FFD700;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    
+    .detail-item .value {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .risk-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    .risk-flag {
+      background: rgba(255, 68, 68, 0.15);
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      color: #FF4444;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 0.65rem;
+    }
+    
+    .console-box {
+      background: #0a0a0a;
+      border-top: 1px solid #2a2a2a;
+      padding: 8px 16px;
+      font-family: monospace;
+      font-size: 0.65rem;
+      max-height: 100px;
+      overflow-y: auto;
+      color: #888;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px;
+      color: #666;
+    }
+    
+    .empty-state h3 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+      color: #888;
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #2a2a2a;
+      border-top-color: #FFD700;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">
+      MATCH ORACLE
+      <span>Football Intelligence</span>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Match Date</div>
+      <input type="date" id="matchDate" value="2026-06-11">
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Season</div>
+      <input type="number" id="season" value="2026">
+    </div>
+    
+    <div class="section">
+      <div class="section-title">Quick Leagues</div>
+      <div class="quick-leagues" id="quickLeagues"></div>
+    </div>
+    
+    <div class="section">
+      <div class="section-title">API Keys (Optional)</div>
+      <input type="password" id="apiKey" placeholder="API-Football Key">
+      <input type="password" id="oddsKey" placeholder="Odds API Key">
+    </div>
+    
+    <div style="margin-top: auto">
+      <button id="runBtn" onclick="runScan()">▶ RUN MATCH ORACLE</button>
+    </div>
+  </div>
 
-# ========== LIVE CLOCK ==========
-st.markdown("""
-<div id="live-clock" style="position: fixed; top: 5px; right: 15px; color: #FFD700; font-family: monospace; font-size: 0.7rem; z-index: 999;"></div>
+  <!-- Main Content -->
+  <div class="main">
+    <div class="main-header">
+      <div>
+        <div class="header-title">SCAN RESULTS</div>
+        <div class="header-subtitle" id="scanDate">No scan yet</div>
+      </div>
+      <div class="header-subtitle" id="liveClock">--:--:-- GMT+3</div>
+    </div>
+
+    <div class="summary-bar" id="summaryBar">
+      <div class="summary-card">
+        <div class="value" id="totalScanned">0</div>
+        <div class="label">Scanned</div>
+      </div>
+      <div class="summary-card approved">
+        <div class="value" id="totalApproved">0</div>
+        <div class="label">Approved</div>
+      </div>
+      <div class="summary-card rejected">
+        <div class="value" id="totalRejected">0</div>
+        <div class="label">Rejected</div>
+      </div>
+      <div class="summary-card caution">
+        <div class="value" id="totalCaution">0</div>
+        <div class="label">Caution</div>
+      </div>
+    </div>
+
+    <div class="content-area" id="contentArea">
+      <div class="empty-state">
+        <div style="font-size: 48px; margin-bottom: 16px;">🎯</div>
+        <h3>Ready to scan</h3>
+        <p>Select leagues and click RUN MATCH ORACLE</p>
+      </div>
+    </div>
+
+    <div class="console-box" id="logBox">Ready. Select leagues and click RUN MATCH ORACLE.</div>
+  </div>
+</div>
+
 <script>
-function updateClock() {
+  // Live clock
+  function updateClock() {
     const now = new Date();
     const options = { timeZone: 'Africa/Nairobi', hour12: false };
     const timeStr = now.toLocaleTimeString('en-US', options);
-    document.getElementById('live-clock').innerHTML = timeStr + ' GMT+3';
-}
-setInterval(updateClock, 1000);
-updateClock();
-</script>
-""", unsafe_allow_html=True)
+    document.getElementById('liveClock').innerHTML = timeStr + ' GMT+3';
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
 
-# ========== API CONFIG ==========
-def get_backend_url():
-    try:
-        backend_url = st.secrets.get("BACKEND_URL", "")
-        if backend_url:
-            return backend_url
-    except:
-        pass
-    return st.session_state.get("backend_url", "https://oracle-backend-1-vryo.onrender.com")
+  // League data
+  const LEAGUES = [
+    { key: "PREMIER_LEAGUE", name: "Premier League", id: 39, country: "England" },
+    { key: "LA_LIGA", name: "La Liga", id: 140, country: "Spain" },
+    { key: "BUNDESLIGA", name: "Bundesliga", id: 78, country: "Germany" },
+    { key: "SERIE_A", name: "Serie A", id: 135, country: "Italy" },
+    { key: "LIGUE_1", name: "Ligue 1", id: 61, country: "France" },
+    { key: "EREDIVISIE", name: "Eredivisie", id: 88, country: "Netherlands" }
+  ];
 
-def test_backend_connection(backend_url):
-    try:
-        response = requests.get(f"{backend_url}/health", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("status") == "healthy":
-                return True, data
-        return False, None
-    except:
-        return False, None
+  let selectedLeagues = new Set();
+  let scanResults = null;
+  let activeTab = null;
+  let scanRunning = false;
+  let statusInterval = null;
 
-# ========== MATCH DATA ==========
-MATCHES = [
-    {
-        "id": 1, "home": "Wexford Youths", "away": "Cork City", "tier": 2,
-        "time": "19:45", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
-        "selection": "Cork City", "selection_odds": 2.36,
-        "prob": 62, "edge": 4.2, "status": "APPROVED"
-    },
-    {
-        "id": 2, "home": "Derry City", "away": "Bohemians FC", "tier": 2,
-        "time": "19:45", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
-        "selection": "Bohemians FC", "selection_odds": 2.36,
-        "prob": 54, "edge": 2.3, "status": "REJECTED", "rejection_reason": "H2H CONFLICT"
-    },
-    {
-        "id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "tier": 2,
-        "time": "19:45", "home_odds": 1.33, "draw_odds": 4.50, "away_odds": 6.00,
-        "selection": "Shamrock Rovers", "selection_odds": 1.33,
-        "prob": 68, "edge": -7.2, "status": "REJECTED", "rejection_reason": "Negative Edge"
-    },
-    {
-        "id": 4, "home": "Ajax", "away": "Feyenoord", "tier": 1,
-        "time": "15:00", "home_odds": 1.85, "draw_odds": 3.70, "away_odds": 3.90,
-        "selection": "Ajax", "selection_odds": 1.85,
-        "prob": 57, "edge": 5.1, "status": "APPROVED"
+  function renderQuickLeagues() {
+    const container = document.getElementById('quickLeagues');
+    container.innerHTML = LEAGUES.map(l => 
+      `<div class="league-btn ${selectedLeagues.has(l.key) ? 'active' : ''}" onclick="toggleLeague('${l.key}')">${l.name}</div>`
+    ).join('');
+  }
+
+  function toggleLeague(key) {
+    if (selectedLeagues.has(key)) {
+      selectedLeagues.delete(key);
+    } else {
+      selectedLeagues.add(key);
     }
-]
+    renderQuickLeagues();
+  }
 
-FORENSIC_DATA = {
-    1: {"status": "APPROVED", "verdict_reason": "Clear value: model 62% vs market implied 58%",
-        "leg_data": {"home_form": "L D W L L", "away_form": "W W D L W", "home_position": 8, "away_position": 3,
-                     "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%", "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"},
-        "stake": 33.50},
-    2: {"status": "REJECTED", "verdict_reason": "H2H CONFLICT",
-        "leg_data": {"home_form": "L L W D L", "away_form": "W W D W L", "home_position": 6, "away_position": 2,
-                     "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%", "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"},
-        "stake": 0},
-    3: {"status": "REJECTED", "verdict_reason": "Negative edge",
-        "leg_data": {"home_form": "W W D W L", "away_form": "L L D L W", "home_position": 1, "away_position": 7,
-                     "h2h_record": "Shamrock 65% | Draw 20% | Shelbourne 15%", "h2h_last6": "Shamrock 4 | Draw 1 | Shelbourne 1"},
-        "stake": 0},
-}
+  async function runScan() {
+    if (scanRunning) return;
+    if (selectedLeagues.size === 0) {
+      alert('Please select at least one league');
+      return;
+    }
 
-# ========== SESSION STATE ==========
-if "page" not in st.session_state:
-    st.session_state.page = "dashboard"
-if "selected_match" not in st.session_state:
-    st.session_state.selected_match = None
-if "backend_status" not in st.session_state:
-    st.session_state.backend_status = "checking"
+    const leagues = Array.from(selectedLeagues);
+    const date = document.getElementById('matchDate').value;
+    const season = parseInt(document.getElementById('season').value);
+    const apiKey = document.getElementById('apiKey').value;
+    const oddsKey = document.getElementById('oddsKey').value;
 
-def check_backend():
-    backend_url = get_backend_url()
-    connected, _ = test_backend_connection(backend_url)
-    st.session_state.backend_status = "connected" if connected else "disconnected"
+    scanRunning = true;
+    document.getElementById('runBtn').textContent = '⏳ RUNNING...';
+    document.getElementById('runBtn').disabled = true;
+    log('🚀 Starting scan...');
 
-if st.session_state.backend_status == "checking":
-    check_backend()
+    try {
+      const resp = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          leagues, 
+          season, 
+          target_date: date,
+          football_key: apiKey,
+          odds_key: oddsKey
+        })
+      });
+      const data = await resp.json();
+      if (data.status === 'started') {
+        log('✅ Scan started. Waiting for results...');
+        startPolling();
+      } else {
+        log('❌ Failed: ' + (data.error || 'Unknown'));
+      }
+    } catch (e) {
+      log('❌ Error: ' + e.message);
+    }
+  }
 
-def navigate_to(page, match=None):
-    st.session_state.page = page
-    if match:
-        st.session_state.selected_match = match
-    st.rerun()
-
-def go_back():
-    navigate_to("dashboard")
-
-# ========== MATCH CARD (CLICKABLE ROW) ==========
-def show_match_card(match):
-    fid = match.get("id", 0)
-    fdata = FORENSIC_DATA.get(fid, {})
-    status = fdata.get("status", "PENDING")
-    
-    # Status icon and color
-    if status == "APPROVED":
-        status_icon = "✅"
-        status_color = "#00FF88"
-    elif status == "REJECTED":
-        if "CONFLICT" in fdata.get("verdict_reason", ""):
-            status_icon = "🚨"
-            status_color = "#FF4444"
-        else:
-            status_icon = "❌"
-            status_color = "#FFA500"
-    else:
-        status_icon = "⚠️"
-        status_color = "#FFD700"
-    
-    edge = match.get("edge", 0)
-    edge_symbol = "+" if edge > 0 else ""
-    edge_color = "#00FF88" if edge > 0 else "#FF4444"
-    prob = match.get("prob", 50)
-    selection = match.get("selection", "?")
-    selection_odds = match.get("selection_odds", 0)
-    
-    # Create a unique key for the row click
-    row_key = f"row_{match.get('id', 0)}"
-    
-    # Use HTML div with onclick for entire row
-    st.markdown(f"""
-    <div class="clickable-row" onclick="window.location.href='?page=match_detail&id={match.get('id', 0)}'">
-    """, unsafe_allow_html=True)
-    
-    # Single row using columns - 9 columns now
-    c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.4, 1.8, 0.6, 0.6, 0.6, 0.6, 1.0, 0.6, 0.4])
-    
-    with c1:
-        st.write(f"**{match.get('tier', '?')}**")
-    
-    with c2:
-        home_short = match.get("home", "?")[:12]
-        away_short = match.get("away", "?")[:12]
-        st.write(f"{home_short} vs {away_short}")
-    
-    with c3:
-        st.write(match.get("time", "TBD"))
-    
-    with c4:
-        st.write(f"{match.get('home_odds', 0):.2f}")
-    
-    with c5:
-        st.write(f"{match.get('draw_odds', 0):.2f}")
-    
-    with c6:
-        st.write(f"{match.get('away_odds', 0):.2f}")
-    
-    with c7:
-        st.markdown(f"{selection} @ {selection_odds:.2f}")
-    
-    with c8:
-        st.markdown(f"<span style='color:{edge_color};'>{edge_symbol}{edge:.1f}%</span>", unsafe_allow_html=True)
-        st.caption(f"{prob}%")
-    
-    with c9:
-        st.markdown(f"<span style='color:{status_color}; font-size:1.2rem;'>{status_icon}</span>", unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.divider()
-
-# ========== LEG DATA TAB ==========
-def show_leg_data(match, fdata):
-    leg_data = fdata.get("leg_data", {})
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**{match.get('home', 'Home')} Form**")
-        st.code(leg_data.get("home_form", "?"), language="text")
-        st.metric("Position", leg_data.get("home_position", "?"))
-    with col2:
-        st.markdown(f"**{match.get('away', 'Away')} Form**")
-        st.code(leg_data.get("away_form", "?"), language="text")
-        st.metric("Position", leg_data.get("away_position", "?"))
-    
-    st.divider()
-    st.markdown("### Head-to-Head Record")
-    st.info(f"All-time: {leg_data.get('h2h_record', 'No data')}")
-    st.info(f"Last 6: {leg_data.get('h2h_last6', 'No data')}")
-
-# ========== FORENSIC TAB ==========
-def show_forensic_tab(match, fdata):
-    st.markdown("### M4: Pre-filter")
-    st.progress(0.75)
-    st.info("6/8 checks passed")
-    
-    st.markdown("### M5: Forensic Failures")
-    st.warning("New Manager Bounce - +2.0 pts")
-    st.warning("High Draw Probability - +1.0 pts")
-    st.success("Total: 2.5 / 4.5 -> PASS")
-    
-    st.markdown("### M6: Personnel")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(f"{match.get('home', 'Home')}", "82/100")
-    with col2:
-        st.metric(f"{match.get('away', 'Away')}", "65/100")
-    
-    st.markdown("### M7: AI Consensus")
-    df = pd.DataFrame([
-        ["DeepSeek", "APPROVE", "78%"],
-        ["Claude", "APPROVE", "72%"],
-        ["Gemini", "CAUTION", "55%"],
-        ["GPT", "APPROVE", "75%"]
-    ], columns=["Provider", "Verdict", "Confidence"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    st.markdown("### M8: Dual Pattern")
-    if "CONFLICT" in fdata.get("verdict_reason", ""):
-        st.error("H2H CONFLICT - HARD REJECT")
-    else:
-        st.metric("Dual Risk Level", "LOW")
-    
-    st.markdown("### M9: Underdog Scanner")
-    st.metric("Underdog Edge", f"{match.get('edge', 0):+.1f}%")
-    
-    st.markdown("### M10: Tally Matrix")
-    st.success("Bilateral Prediction: HOME")
-    
-    st.markdown("### M26: Match Context")
-    st.metric("Match Importance", "72%")
-    
-    st.markdown("### M27: H2H Analysis")
-    st.metric("H2H Score", "78/100")
-    
-    st.divider()
-    if fdata.get("status") == "APPROVED":
-        st.success(f"FINAL: APPROVED | Stake: ${fdata.get('stake', 0):.2f}")
-    elif "CONFLICT" in fdata.get("verdict_reason", ""):
-        st.error("FINAL: REJECTED (H2H CONFLICT)")
-
-# ========== MATCH DETAIL ==========
-def show_match_detail():
-    # Get match ID from query params or session state
-    import urllib.parse
-    query_params = st.query_params
-    match_id = query_params.get("id", None)
-    
-    if match_id:
-        match_id = int(match_id)
-        for match in MATCHES:
-            if match.get("id") == match_id:
-                st.session_state.selected_match = match
-                break
-    
-    match = st.session_state.selected_match
-    if not match:
-        st.error("No match selected")
-        if st.button("← Back"):
-            go_back()
-        return
-    
-    fid = match.get("id", 0)
-    fdata = FORENSIC_DATA.get(fid, {})
-    
-    st.markdown(f"## {match.get('home', '?')} vs {match.get('away', '?')}")
-    st.caption(f"Kickoff: {match.get('time', 'TBD')} | Selection: {match.get('selection', '?')} @ {match.get('selection_odds', 0):.2f}")
-    
-    if st.button("← Back to Dashboard"):
-        go_back()
-    
-    st.divider()
-    
-    tab1, tab2 = st.tabs(["Leg Data", "Forensic Report"])
-    with tab1:
-        show_leg_data(match, fdata)
-    with tab2:
-        show_forensic_tab(match, fdata)
-
-# ========== DASHBOARD ==========
-def show_dashboard():
-    st.markdown('<h1 class="main-header">MATCH ORACLE</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">AI-Powered Football Intelligence</p>', unsafe_allow_html=True)
-    
-    if st.session_state.backend_status == "connected":
-        st.success("✅ BACKEND ONLINE")
-    else:
-        st.warning("⚠️ BACKEND OFFLINE - Using demo data")
-    
-    st.markdown("## Today's Fixtures")
-    st.caption(f"{len(MATCHES)} matches • {datetime.now(NAIROBI_TZ).strftime('%A, %B %d, %Y')}")
-    
-    # Table header
-    c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.4, 1.8, 0.6, 0.6, 0.6, 0.6, 1.0, 0.6, 0.4])
-    with c1:
-        st.markdown("**Tier**")
-    with c2:
-        st.markdown("**Match**")
-    with c3:
-        st.markdown("**Time**")
-    with c4:
-        st.markdown("**Home**")
-    with c5:
-        st.markdown("**Draw**")
-    with c6:
-        st.markdown("**Away**")
-    with c7:
-        st.markdown("**Selection**")
-    with c8:
-        st.markdown("**Edge/Prob**")
-    with c9:
-        st.markdown("**Status**")
-    
-    st.divider()
-    
-    for match in MATCHES:
-        show_match_card(match)
-
-# ========== OTHER PAGES ==========
-def show_performance():
-    st.markdown("## Performance Metrics")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Calibration Grade", "B")
-    with col2:
-        st.metric("Brier Score", "0.187")
-    with col3:
-        st.metric("ECE", "0.094")
-
-def show_bankroll():
-    st.markdown("## Bankroll Manager")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Current", "$12,450")
-    with col2:
-        st.metric("Peak", "$13,200")
-    with col3:
-        st.metric("Drawdown", "5.7%")
-    with col4:
-        st.metric("Multiplier", "0.85x")
-
-def show_top_picks():
-    st.markdown("## Top Picks")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    for match in MATCHES:
-        if FORENSIC_DATA.get(match.get("id", 0), {}).get("status") == "APPROVED":
-            st.write(f"{match.get('home')} vs {match.get('away')} - {match.get('selection')} @ {match.get('selection_odds'):.2f}")
-
-def show_parlays():
-    st.markdown("## Parlays")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    st.info("Coming soon")
-
-def show_all_legs():
-    st.markdown("## All Legs")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    for match in MATCHES:
-        st.write(f"{match.get('home')} vs {match.get('away')}")
-
-def show_countries():
-    st.markdown("## Countries")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    st.info("Coming soon")
-
-def show_calendar():
-    st.markdown("## Calendar")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    st.date_input("Select Date", datetime.now(NAIROBI_TZ).date())
-
-def show_settings():
-    st.markdown("## Settings")
-    if st.button("← Back"):
-        navigate_to("dashboard")
-    st.divider()
-    
-    if st.button("Test Connection", use_container_width=True):
-        check_backend()
-        if st.session_state.backend_status == "connected":
-            st.success("Connected!")
-        else:
-            st.error("Not connected")
-
-# ========== MAIN ==========
-def main():
-    with st.sidebar:
-        st.markdown("### MATCH ORACLE")
-        st.markdown("---")
+  function startPolling() {
+    if (statusInterval) clearInterval(statusInterval);
+    statusInterval = setInterval(async () => {
+      try {
+        const resp = await fetch('/api/status');
+        const data = await resp.json();
         
-        if st.session_state.backend_status == "connected":
-            st.success("🟢 ONLINE")
-        else:
-            st.error("🔴 OFFLINE")
+        // Update logs
+        if (data.log && data.log.length > 0) {
+          const logBox = document.getElementById('logBox');
+          const last = data.log[data.log.length - 1];
+          if (!logBox.innerHTML.includes(last)) {
+            logBox.innerHTML = data.log.slice(-50).join('\n');
+            logBox.scrollTop = logBox.scrollHeight;
+          }
+        }
         
-        st.markdown("---")
+        // Update results
+        if (data.results && data.results.leagues && data.results.leagues.length > 0) {
+          scanResults = data.results;
+          if (!activeTab && scanResults.leagues[0]) activeTab = scanResults.leagues[0].league;
+          renderResults();
+        }
         
-        if st.button("🏠 Dashboard", use_container_width=True):
-            navigate_to("dashboard")
-        
-        st.markdown("---")
-        st.markdown("**ANALYTICS**")
-        if st.button("📈 Performance", use_container_width=True):
-            navigate_to("performance")
-        if st.button("💰 Bankroll", use_container_width=True):
-            navigate_to("bankroll")
-        if st.button("🏆 Top Picks", use_container_width=True):
-            navigate_to("top_picks")
-        if st.button("🔗 Parlays", use_container_width=True):
-            navigate_to("parlays")
-        
-        st.markdown("---")
-        st.markdown("**DATA**")
-        if st.button("📋 All Legs", use_container_width=True):
-            navigate_to("all_legs")
-        if st.button("🌍 Countries", use_container_width=True):
-            navigate_to("countries")
-        if st.button("📅 Calendar", use_container_width=True):
-            navigate_to("calendar")
-        if st.button("⚙️ Settings", use_container_width=True):
-            navigate_to("settings")
-        
-        st.markdown("---")
-        st.caption("v4.0")
-    
-    # Handle direct navigation from clickable rows
-    import urllib.parse
-    query_params = st.query_params
-    if "page" in query_params and query_params["page"] == "match_detail":
-        st.session_state.page = "match_detail"
-        # Clear query params to prevent loop
-        st.query_params.clear()
-    
-    page = st.session_state.page
-    if page == "dashboard":
-        show_dashboard()
-    elif page == "match_detail":
-        show_match_detail()
-    elif page == "performance":
-        show_performance()
-    elif page == "bankroll":
-        show_bankroll()
-    elif page == "top_picks":
-        show_top_picks()
-    elif page == "parlays":
-        show_parlays()
-    elif page == "all_legs":
-        show_all_legs()
-    elif page == "countries":
-        show_countries()
-    elif page == "calendar":
-        show_calendar()
-    elif page == "settings":
-        show_settings()
-    else:
-        show_dashboard()
+        if (!data.running) {
+          clearInterval(statusInterval);
+          scanRunning = false;
+          document.getElementById('runBtn').textContent = '▶ RUN MATCH ORACLE';
+          document.getElementById('runBtn').disabled = false;
+        }
+      } catch (e) {
+        console.error('Poll error:', e);
+      }
+    }, 2000);
+  }
 
-if __name__ == "__main__":
-    main()
+  function renderResults() {
+    if (!scanResults) return;
+    
+    const totals = scanResults.totals || {};
+    document.getElementById('totalScanned').textContent = totals.total || 0;
+    document.getElementById('totalApproved').textContent = totals.approved || 0;
+    document.getElementById('totalRejected').textContent = totals.rejected || 0;
+    document.getElementById('totalCaution').textContent = totals.caution || 0;
+    document.getElementById('scanDate').textContent = scanResults.date_fetched || 'Scan complete';
+
+    const leagues = scanResults.leagues || [];
+    const container = document.getElementById('contentArea');
+    
+    let html = '<div class="league-tabs">';
+    for (const league of leagues) {
+      const isActive = activeTab === league.league;
+      html += `<div class="league-tab ${isActive ? 'active' : ''}" onclick="switchTab('${league.league}')">${league.league} <span style="opacity:0.6">(${league.matches.length})</span></div>`;
+    }
+    html += '</div>';
+    
+    const activeLeague = leagues.find(l => l.league === activeTab);
+    if (activeLeague) {
+      for (let i = 0; i < activeLeague.matches.length; i++) {
+        html += renderMatchCard(activeLeague.matches[i], i);
+      }
+    }
+    
+    container.innerHTML = html;
+  }
+
+  function renderMatchCard(m, idx) {
+    const status = m.final_status || 'PENDING';
+    const verdictClass = status.includes('APPROVED') ? 'APPROVED' : status.includes('CAUTION') ? 'CAUTION' : 'REJECTED';
+    const prob = m.oracle?.model_prob ? (m.oracle.model_prob * 100).toFixed(1) + '%' : '—';
+    const edge = m.oracle?.edge ? (m.oracle.edge * 100).toFixed(1) + '%' : '—';
+    const edgeClass = m.oracle?.edge > 0 ? 'positive' : (m.oracle?.edge < 0 ? 'negative' : '');
+    const home = m.match ? m.match.split(' vs ')[0] : '?';
+    const away = m.match ? m.match.split(' vs ')[1] : '?';
+    
+    return `
+      <div class="match-card">
+        <div class="match-row" onclick="toggleDetail(${idx})">
+          <div class="match-teams">
+            <div class="teams">${home} <span style="color:#666;">vs</span> ${away}</div>
+            <div class="meta">${m.match_date || ''} · ${m.selection || '?'}</div>
+          </div>
+          <div class="match-odds">
+            <div class="odd-box"><div class="odd-label">H</div><div class="odd-value">${m.home_odds || '?'}</div></div>
+            <div class="odd-box"><div class="odd-label">D</div><div class="odd-value">${m.draw_odds || '?'}</div></div>
+            <div class="odd-box"><div class="odd-label">A</div><div class="odd-value">${m.away_odds || '?'}</div></div>
+          </div>
+          <div class="verdict-badge verdict-${verdictClass}">${status}</div>
+          <div class="match-prob"><div class="prob-label">PROB</div><div class="value">${prob}</div></div>
+          <div class="match-edge"><div class="edge-label">EDGE</div><div class="value ${edgeClass}">${edge}</div></div>
+        </div>
+        <div class="match-detail" id="detail-${idx}">
+          <div class="detail-tabs">
+            <div class="detail-tab active" onclick="switchDetailTab(${idx}, 'leg')">Leg Data</div>
+            <div class="detail-tab" onclick="switchDetailTab(${idx}, 'forensic')">Forensic Report</div>
+          </div>
+          <div class="detail-content active" id="leg-${idx}">
+            <div class="detail-grid">
+              <div class="detail-item"><div class="label">Match</div><div class="value">${m.match}</div></div>
+              <div class="detail-item"><div class="label">Selection</div><div class="value">${m.selection || '—'}</div></div>
+              <div class="detail-item"><div class="label">Odds</div><div class="value">${m.odds || '—'}</div></div>
+              <div class="detail-item"><div class="label">Model Probability</div><div class="value">${prob}</div></div>
+              <div class="detail-item"><div class="label">Edge</div><div class="value ${edgeClass}">${edge}</div></div>
+              <div class="detail-item"><div class="label">Pre-Filter</div><div class="value">${m.oracle?.pre_filter_passed ? 'PASSED' : 'FAILED'} (${m.oracle?.pre_filter_checks || 0}/8)</div></div>
+              <div class="detail-item"><div class="label">Dual Risk</div><div class="value">${m.oracle?.dual_risk_level || '—'}</div></div>
+            </div>
+          </div>
+          <div class="detail-content" id="forensic-${idx}">
+            <div class="detail-grid">
+              <div class="detail-item" style="grid-column:1/-1">
+                <div class="label">Risk Flags</div>
+                <div class="risk-flags">${(m.risk_flags || []).map(f => `<span class="risk-flag">${f}</span>`).join('') || 'None'}</div>
+              </div>
+              <div class="detail-item" style="grid-column:1/-1">
+                <div class="label">Decision Notes</div>
+                <div class="value" style="font-size:0.7rem;">${(m.decision_notes || []).map(n => `• ${n}`).join('<br>') || 'None'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function switchTab(league) {
+    activeTab = league;
+    renderResults();
+  }
+
+  function toggleDetail(idx) {
+    const el = document.getElementById('detail-' + idx);
+    if (el) el.classList.toggle('show');
+  }
+
+  function switchDetailTab(idx, tab) {
+    const parent = document.getElementById('detail-' + idx);
+    if (!parent) return;
+    parent.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+    parent.querySelectorAll('.detail-content').forEach(c => c.classList.remove('active'));
+    if (tab === 'leg') {
+      parent.querySelector('.detail-tab:first-child').classList.add('active');
+      document.getElementById('leg-' + idx).classList.add('active');
+    } else {
+      parent.querySelector('.detail-tab:last-child').classList.add('active');
+      document.getElementById('forensic-' + idx).classList.add('active');
+    }
+  }
+
+  function log(msg) {
+    const logBox = document.getElementById('logBox');
+    const ts = new Date().toLocaleTimeString();
+    logBox.innerHTML = `[${ts}] ${msg}\n` + logBox.innerHTML;
+    if (logBox.innerHTML.split('\n').length > 100) {
+      logBox.innerHTML = logBox.innerHTML.split('\n').slice(0, 100).join('\n');
+    }
+  }
+
+  renderQuickLeagues();
+  startPolling();
+</script>
+</body>
+</html>
