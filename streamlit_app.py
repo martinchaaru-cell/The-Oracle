@@ -14,18 +14,15 @@ st.set_page_config(
 
 # ========== API KEY CONFIGURATION ==========
 def get_backend_url():
-    """Get backend URL from secrets or session state"""
     try:
         backend_url = st.secrets.get("BACKEND_URL", "")
         if backend_url:
             return backend_url
     except:
         pass
-    
     return st.session_state.get("backend_url", "https://oracle-backend-1-vryo.onrender.com")
 
 def test_backend_connection(backend_url):
-    """Test if backend is reachable and healthy"""
     try:
         response = requests.get(f"{backend_url}/health", timeout=5)
         if response.status_code == 200:
@@ -33,34 +30,61 @@ def test_backend_connection(backend_url):
             if data.get("status") == "healthy":
                 return True, data
         return False, None
-    except requests.exceptions.ConnectionError:
-        return False, None
-    except requests.exceptions.Timeout:
-        return False, None
-    except Exception:
+    except:
         return False, None
 
 # ========== MOCK DATA ==========
 MOCK_FIXTURES = [
-    {"id": 1, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "time": "12:30", "odds": 1.85, "status": "NS"},
-    {"id": 2, "home": "Arsenal", "away": "Chelsea", "league": "Premier League", "time": "15:00", "odds": 2.10, "status": "NS"},
-    {"id": 3, "home": "Bayern Munich", "away": "Dortmund", "league": "Bundesliga", "time": "15:00", "odds": 1.75, "status": "NS"},
-    {"id": 4, "home": "PSG", "away": "Marseille", "league": "Ligue 1", "time": "16:00", "odds": 1.55, "status": "NS"},
-    {"id": 5, "home": "Manchester City", "away": "Liverpool", "league": "Premier League", "time": "17:30", "odds": 1.95, "status": "NS"},
-    {"id": 6, "home": "Inter Milan", "away": "Juventus", "league": "Serie A", "time": "19:45", "odds": 2.05, "status": "NS"},
-    {"id": 7, "home": "Real Madrid", "away": "Barcelona", "league": "La Liga", "time": "20:00", "odds": 2.25, "status": "NS"},
+    {"id": 1, "home": "Wexford Youths", "away": "Cork City", "league": "League of Ireland", "time": "19:45", "odds": 1.73, "status": "NS", "prob": 62, "edge": 4.2, "confidence": "HIGH", "selection": "Cork City"},
+    {"id": 2, "home": "Derry City", "away": "Bohemians FC", "league": "League of Ireland", "time": "19:45", "odds": 2.36, "status": "NS", "prob": 54, "edge": 2.3, "confidence": "HIGH", "selection": "Bohemians FC"},
+    {"id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "league": "League of Ireland", "time": "19:45", "odds": 1.33, "status": "NS", "prob": 68, "edge": -7.2, "confidence": "HIGH", "selection": "Shamrock Rovers"},
+    {"id": 4, "home": "Treaty United", "away": "Bray Wanderers", "league": "League of Ireland", "time": "19:45", "odds": 1.79, "status": "NS", "prob": 54, "edge": -1.9, "confidence": "MEDIUM", "selection": "Bray Wanderers"},
+    {"id": 5, "home": "Finn Harps", "away": "UCD Dublin", "league": "League of Ireland", "time": "19:45", "odds": 1.85, "status": "NS", "prob": 53, "edge": -1.1, "confidence": "MEDIUM", "selection": "UCD Dublin"},
+    {"id": 6, "home": "Waterford", "away": "Sligo Rovers", "league": "League of Ireland", "time": "19:45", "odds": 2.50, "status": "NS", "prob": 36, "edge": 3.2, "confidence": "LOW", "selection": "Sligo Rovers"},
 ]
 
-MOCK_LIVE = [
-    {"id": 8, "home": "AC Milan", "away": "Roma", "league": "Serie A", "time": "LIVE 67'", "home_score": 2, "away_score": 1, "status": "LIVE"},
-]
+# Mock forensic data for each fixture
+FORENSIC_DATA = {
+    1: {  # Wexford vs Cork City (APPROVED)
+        "status": "APPROVED",
+        "m4_passed": True, "m4_checks": 6, "m4_total": 8,
+        "m5_score": 2.5, "m5_threshold": 4.5,
+        "m8_conflict": False,
+        "edge": 4.2, "prob": 62, "odds": 1.73,
+        "stake": 33.50, "bankroll": 1000,
+        "reason": "Clear value: model 62% vs implied 58%",
+        "h2h_conflict": False,
+        "current_season_wr": 45, "h2h_wr": 38,
+        "kelly_raw": 0.085, "kelly_adj": 0.0335,
+    },
+    2: {  # Derry vs Bohemians (CONFLICT REJECT)
+        "status": "REJECTED",
+        "m4_passed": True, "m4_checks": 6, "m4_total": 8,
+        "m5_score": 2.5, "m5_threshold": 4.5,
+        "m8_conflict": True, "m8_severity": "HIGH",
+        "edge": 2.3, "prob": 54, "odds": 2.36,
+        "stake": 0, "bankroll": 1000,
+        "reason": "H2H CONFLICT: Historical favours Derry, current season favours Bohemians",
+        "h2h_conflict": True,
+        "current_season_wr": 45, "h2h_wr": 46,
+        "conflict_details": "H2H history (80+ matches): Derry 46% wins | Current season: Bohemians 45% WR",
+    },
+    3: {  # Shamrock vs Shelbourne (NEGATIVE EDGE)
+        "status": "REJECTED",
+        "m4_passed": True, "m4_checks": 6, "m4_total": 8,
+        "m5_score": 2.5, "m5_threshold": 4.5,
+        "m8_conflict": False,
+        "edge": -7.2, "prob": 68, "odds": 1.33,
+        "stake": 0, "bankroll": 1000,
+        "reason": "Negative edge: model 68% vs market 75% (implied)",
+        "h2h_conflict": False,
+    },
+}
 
 LEAGUE_STATS = [
     {"league": "Premier League", "count": 12, "accuracy": 62, "roi": 15.2},
     {"league": "La Liga", "count": 10, "accuracy": 58, "roi": 9.8},
     {"league": "Bundesliga", "count": 8, "accuracy": 59, "roi": 11.2},
-    {"league": "Serie A", "count": 8, "accuracy": 51, "roi": 4.5},
-    {"league": "Ligue 1", "count": 6, "accuracy": 61, "roi": 13.4},
 ]
 
 BANKROLL_HISTORY = [
@@ -69,43 +93,6 @@ BANKROLL_HISTORY = [
     {"date": "Jun 5", "bankroll": 10800}, {"date": "Jun 6", "bankroll": 11200},
     {"date": "Jun 7", "bankroll": 11800}, {"date": "Jun 8", "bankroll": 12450},
 ]
-
-TOP_PICKS = [
-    {"match": "Arsenal vs Chelsea", "selection": "Arsenal", "odds": 2.10, "prob": 62, "edge": 8.1},
-    {"match": "Bayern vs Dortmund", "selection": "Bayern", "odds": 1.75, "prob": 58, "edge": 6.7},
-    {"match": "Inter vs Juventus", "selection": "Inter", "odds": 2.05, "prob": 55, "edge": 4.2},
-]
-
-PARLAYS = {
-    "safe": {"legs": ["Arsenal (2.10)", "Bayern (1.75)"], "odds": 3.68, "prob": 36},
-    "balanced": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "PSG (1.55)"], "odds": 5.70, "prob": 22},
-    "aggressive": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "Inter (2.05)", "Ajax (1.85)"], "odds": 13.95, "prob": 11},
-}
-
-COUNTRIES = [
-    {"flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "England", "leagues": ["Premier League", "Championship", "League One"]},
-    {"flag": "🇪🇸", "name": "Spain", "leagues": ["La Liga", "Segunda Division"]},
-    {"flag": "🇩🇪", "name": "Germany", "leagues": ["Bundesliga", "2. Bundesliga"]},
-    {"flag": "🇮🇹", "name": "Italy", "leagues": ["Serie A", "Serie B"]},
-    {"flag": "🇫🇷", "name": "France", "leagues": ["Ligue 1", "Ligue 2"]},
-    {"flag": "🇳🇱", "name": "Netherlands", "leagues": ["Eredivisie"]},
-    {"flag": "🇵🇹", "name": "Portugal", "leagues": ["Primeira Liga"]},
-    {"flag": "🇧🇷", "name": "Brazil", "leagues": ["Serie A"]},
-    {"flag": "🇦🇷", "name": "Argentina", "leagues": ["Primera Division"]},
-    {"flag": "🇯🇵", "name": "Japan", "leagues": ["J1 League"]},
-]
-
-# ========== HELPER FUNCTIONS ==========
-def group_fixtures_by_league(fixtures):
-    grouped = {}
-    for f in fixtures:
-        league = f['league']
-        if league not in grouped:
-            grouped[league] = []
-        grouped[league].append(f)
-    for league in grouped:
-        grouped[league].sort(key=lambda x: x['time'])
-    return grouped
 
 # ========== SESSION STATE ==========
 if "page" not in st.session_state:
@@ -116,23 +103,12 @@ if "backend_status" not in st.session_state:
     st.session_state.backend_status = "checking"
 if "backend_url" not in st.session_state:
     st.session_state.backend_url = get_backend_url()
-if "backend_data" not in st.session_state:
-    st.session_state.backend_data = None
 
-# ========== CHECK BACKEND ON STARTUP ==========
+# ========== CHECK BACKEND ==========
 def check_backend():
-    """Check backend connection and update status"""
-    backend_url = st.session_state.backend_url
-    connected, data = test_backend_connection(backend_url)
-    
-    if connected:
-        st.session_state.backend_status = "connected"
-        st.session_state.backend_data = data
-    else:
-        st.session_state.backend_status = "disconnected"
-        st.session_state.backend_data = None
+    connected, data = test_backend_connection(st.session_state.backend_url)
+    st.session_state.backend_status = "connected" if connected else "disconnected"
 
-# Run backend check on first load
 if st.session_state.backend_status == "checking":
     check_backend()
 
@@ -144,364 +120,407 @@ def navigate_to(page):
 def go_back():
     navigate_to("dashboard")
 
-# ========== FORENSIC REPORT PAGE ==========
+# ========== FORENSIC REPORT PAGE (DETAILED) ==========
 def show_forensic_report(fixture):
+    fid = fixture['id']
+    fdata = FORENSIC_DATA.get(fid, {})
+    
+    # Header
     st.title(f"🔬 {fixture['home']} vs {fixture['away']}")
-    st.caption(f"{fixture['league']} | Kickoff: {fixture['time']}")
+    st.caption(f"{fixture['league']} | Kickoff: {fixture['time']} | Selection: {fixture['selection']} @ {fixture['odds']:.2f}")
     
     if st.button("← Back to Fixtures"):
         go_back()
     
     st.divider()
     
-    tab1, tab2 = st.tabs(["📊 Match Data", "🔬 Forensic Report"])
+    # Status Banner
+    if fdata.get("status") == "APPROVED":
+        st.success("✅ QUALIFIED - RECOMMENDED BET")
+    elif fdata.get("m8_conflict"):
+        st.error("🚨 H2H CONFLICT DETECTED - HARD REJECT")
+    elif fdata.get("edge", 0) < 0:
+        st.warning("⚠️ REJECTED - Negative Edge (No Value)")
+    else:
+        st.info("ℹ️ PENDING REVIEW")
     
-    with tab1:
+    st.divider()
+    
+    # ===== MODULE 4: PRE-FILTER =====
+    st.markdown("### M4: Asymmetric Pre-filter (8 Checks)")
+    m4_passed = fdata.get("m4_passed", False)
+    m4_checks = fdata.get("m4_checks", 0)
+    m4_total = fdata.get("m4_total", 8)
+    
+    checks = [
+        {"name": "C1: Season Win Gap", "passed": True, "value": 14, "threshold": 3},
+        {"name": "C2: Venue Win Gap", "passed": True, "value": 0.22, "threshold": 0.15},
+        {"name": "C3: H2H Favoured", "passed": True, "value": 0.65, "threshold": 0.50},
+        {"name": "C4: Transition Favours", "passed": True, "value": 0.58, "threshold": 0.45},
+        {"name": "C5: Bounce-back Rate", "passed": False, "value": 0.38, "threshold": 0.45},
+        {"name": "C6: Ceiling Proximity", "passed": True, "value": 0.72, "threshold": 0.88},
+        {"name": "C7: Momentum Gap", "passed": True, "value": 0.40, "threshold": 0.20},
+        {"name": "C8: Resilience Gap", "passed": True, "value": 0.42, "threshold": 0.10},
+    ]
+    
+    for check in checks:
+        icon = "✅" if check["passed"] else "❌"
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            st.write(f"{icon} {check['name']}")
+        with col2:
+            st.write(f"Value: {check['value']}")
+        with col3:
+            st.write(f"Threshold: {check['threshold']}")
+    
+    st.markdown(f"**Result:** {m4_checks}/{m4_total} passed → {'✅ PASS' if m4_passed else '❌ FAIL'}")
+    
+    st.divider()
+    
+    # ===== MODULE 5: FORENSIC FAILURES =====
+    st.markdown("### M5: Forensic Failures")
+    failures = [
+        {"name": "New Manager Bounce (underdog)", "points": 2.0},
+        {"name": "High Draw Probability (25%)", "points": 1.0},
+    ]
+    for f in failures:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.write(f"⚠️ {f['name']}")
+        with col2:
+            st.write(f"+{f['points']} pts")
+    
+    m5_score = fdata.get("m5_score", 0)
+    m5_threshold = fdata.get("m5_threshold", 4.5)
+    st.markdown(f"**Total Failure Score:** {m5_score} / {m5_threshold} → {'✅ PASS' if m5_score < m5_threshold else '❌ FAIL'}")
+    
+    st.divider()
+    
+    # ===== MODULE 6: PERSONNEL =====
+    st.markdown("### M6: Personnel Forensics")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**{fixture['home']}**")
+        st.metric("Personnel Score", "82/100", "Healthy")
+        st.write("Key injuries: None")
+        st.write("Fatigue: LOW")
+    with col2:
+        st.markdown(f"**{fixture['away']}**")
+        st.metric("Personnel Score", "65/100", "1 injury")
+        st.write("Key injuries: 1 (midfielder)")
+        st.write("Fatigue: MEDIUM")
+    
+    st.divider()
+    
+    # ===== MODULE 7: AI CONSENSUS =====
+    st.markdown("### M7: AI Consensus")
+    ai_data = pd.DataFrame([
+        {"Provider": "DeepSeek", "Verdict": "APPROVE", "Confidence": "78%"},
+        {"Provider": "Claude", "Verdict": "APPROVE", "Confidence": "72%"},
+        {"Provider": "Gemini", "Verdict": "CAUTION", "Confidence": "55%"},
+        {"Provider": "GPT", "Verdict": "APPROVE", "Confidence": "75%"},
+    ])
+    st.dataframe(ai_data, use_container_width=True, hide_index=True)
+    st.markdown("**Consensus:** 3/4 APPROVE → ✅ APPROVED")
+    
+    st.divider()
+    
+    # ===== MODULE 8: DUAL PATTERN (CONFLICT DETECTION) =====
+    st.markdown("### M8: Dual Pattern Engine")
+    
+    if fdata.get("h2h_conflict", False):
+        st.error("🚨 H2H CONFLICT DETECTED - HARD REJECT")
+        st.markdown(f"""
+        **H2H HISTORY (80+ matches):**
+        - {fixture['home']}: {fdata.get('h2h_wr', 46)}% wins
+        - Draws: 30%
+        - {fixture['away']}: {100 - fdata.get('h2h_wr', 46) - 30}% wins
+        
+        **CURRENT SEASON (20 matches):**
+        - {fixture['home']}: 20% wins, 6th place
+        - {fixture['away']}: {fdata.get('current_season_wr', 45)}% wins, 2nd place
+        
+        **CONFLICT:** H2H and current season directly contradict each other.
+        
+        **M8 v6 RULE:** "If ANY conflict detected → HARD REJECT (stake multiplier = 0.0)"
+        """)
+    else:
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Home Form", "W W D W L", "+2")
-            st.metric("Home Goals/Game", "2.1", "↑")
-            st.metric("Home xG", "1.8", "↓")
+            st.metric("Dual Risk Level", "LOW")
+            st.metric("Underdog Threat", "NONE")
         with col2:
-            st.metric("Away Form", "L L D L W", "-3")
-            st.metric("Away Goals/Game", "1.2", "↓")
-            st.metric("Away xG", "1.4", "↑")
+            st.metric("Pattern Clash Score", "0.18")
+            st.metric("Resilience Gap", "+0.24")
     
-    with tab2:
-        st.markdown("### M4: Pre-filter (6/8 passed)")
-        st.progress(0.75)
-        st.markdown("### M5: Forensic Failures")
-        st.metric("Total Failure Score", "2.5 / 4.5", "PASS")
+    st.divider()
+    
+    # ===== MODULE 9: UNDERDOG SCANNER =====
+    st.markdown("### M9: Underdog Scanner")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Underdog Edge", f"{fdata.get('edge', 0):+.1f}%")
+        st.metric("Threat Level", "LOW")
+    with col2:
+        st.metric("Pattern Score", "22/100")
+        st.metric("Goldmine Qualified", "❌ No")
+    
+    st.divider()
+    
+    # ===== MODULE 10: TALLY MATRIX =====
+    st.markdown("### M10: Tally Matrix")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Matrix Useful", "✅ YES")
+        st.metric("Bilateral Prediction", "HOME")
+    with col2:
+        st.metric("Bilateral Confidence", "HIGH")
+        st.metric("Trap/Value Signal", "NONE")
+    
+    st.divider()
+    
+    # ===== MODULE 26: MATCH CONTEXT =====
+    st.markdown("### M26: Match Context")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Match Importance", "72%")
+        st.write("Is Rivalry: ✅ Yes")
+    with col2:
+        st.metric("Home Motivation", "HIGH")
+        st.metric("Away Motivation", "NORMAL")
+    
+    st.divider()
+    
+    # ===== MODULE 27: H2H DEEP ANALYSIS =====
+    st.markdown("### M27: H2H Deep Analysis")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("H2H Score", "78/100", "FAV_EDGE")
+        st.write(f"Games: 48 | Fav 29 | Draw 11 | Und 8")
+    with col2:
+        st.metric("Draw Rate", "23%")
+        st.metric("Psychological Block", "❌ No")
+        st.metric("Draw Boost Factor", "1.00x")
+    
+    st.divider()
+    
+    # ===== RISK FLAGS =====
+    st.markdown("### ⚠️ Risk Flags")
+    risk_flags = ["Pattern clash moderate", "H2H bounce-back threat: 45%"]
+    for flag in risk_flags:
+        st.warning(flag)
+    
+    st.divider()
+    
+    # ===== FINAL VERDICT & STAKE =====
+    st.markdown("### ✅ FINAL VERDICT")
+    
+    if fdata.get("status") == "APPROVED":
+        stake = fdata.get("stake", 0)
+        bankroll = fdata.get("bankroll", 1000)
+        stake_pct = (stake / bankroll) * 100 if bankroll > 0 else 0
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("### M6: Personnel")
-            st.metric(f"{fixture['home']}", "82/100", "Healthy")
-            st.metric(f"{fixture['away']}", "65/100", "1 injury")
-        with col2:
-            st.markdown("### M7: AI Consensus")
-            st.write("DeepSeek: ✅ APPROVE")
-            st.write("Claude: ✅ APPROVE")
-            st.write("Gemini: ⚠️ CAUTION")
-            st.write("GPT: ✅ APPROVE")
+        st.success(f"""
+        **STATUS: APPROVED**
+        - Confidence: {fixture['confidence']}
+        - Edge: +{fdata.get('edge', 0)}%
+        - Model Probability: {fdata.get('prob', 0)}%
+        - Kelly Stake: £{stake:.2f} ({stake_pct:.2f}% of bankroll)
+        - Potential Return: £{stake * fixture['odds']:.2f}
+        - Potential Profit: £{stake * (fixture['odds'] - 1):.2f}
+        """)
+    elif fdata.get("m8_conflict"):
+        st.error(f"""
+        **STATUS: REJECTED (H2H CONFLICT)**
+        - Edge: +{fdata.get('edge', 0)}% (would be value)
+        - Model Probability: {fdata.get('prob', 0)}%
+        - Odds: {fixture['odds']:.2f}
         
-        st.markdown("### M8: Dual Pattern")
-        st.info("Risk Level: LOW | Underdog Threat: NONE")
-        st.markdown("### M9: Underdog Scanner")
-        st.metric("Underdog Edge", "-2.1%", "No value")
-        st.markdown("### M10: Tally Matrix")
-        st.success("Bilateral Prediction: HOME (HIGH confidence)")
-        st.markdown("### M26: Match Context")
-        st.write("🏆 London Derby | Importance: 72%")
-        st.markdown("### M27: H2H Analysis")
-        st.write("H2H Score: 78/100 (FAV_EDGE)")
-        st.write("Games: 48 | Fav 29 | Draw 11 | Und 8")
-        st.divider()
-        st.success("✅ FINAL VERDICT: APPROVED (HIGH confidence)")
+        **Reason:** {fdata.get('reason', 'H2H vs current season contradiction')}
+        
+        **M8 v6 Rule:** Conflict = HARD REJECT (stake multiplier = 0.0)
+        """)
+    elif fdata.get("edge", 0) < 0:
+        st.warning(f"""
+        **STATUS: REJECTED (Negative Edge)**
+        - Model Probability: {fdata.get('prob', 0)}%
+        - Implied Probability: {(1/fixture['odds'] * 100):.1f}%
+        - Edge: {fdata.get('edge', 0):+.1f}%
+        
+        **Reason:** Model says {fdata.get('prob', 0)}%, market says {(1/fixture['odds'] * 100):.1f}%. No value.
+        """)
+    else:
+        st.info(f"**STATUS: {fdata.get('status', 'PENDING')}**")
+    
+    st.divider()
+    
+    # ===== KELLY CALCULATION DETAILS =====
+    if fdata.get("status") == "APPROVED":
+        st.markdown("### 📊 Kelly Calculation")
+        st.markdown(f"""
+        - Raw Kelly Fraction: {fdata.get('kelly_raw', 0.085)*100:.2f}%
+        - Confidence Scaling: {fdata.get('confidence', 'HIGH')} → 50% of Kelly
+        - Adjusted Kelly: {fdata.get('kelly_adj', 0.0335)*100:.2f}%
+        - Bankroll: £{fdata.get('bankroll', 1000):.0f}
+        - Final Stake: **£{fdata.get('stake', 0):.2f}**
+        """)
 
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
     st.title("🎯 MATCH ORACLE")
     st.caption(f"📅 {datetime.now().strftime('%A, %B %d, %Y')}")
     
-    # ===== BACKEND STATUS BANNER =====
+    # Backend status banner
     if st.session_state.backend_status == "connected":
         st.success(f"✅ BACKEND CONNECTED | {st.session_state.backend_url}")
     elif st.session_state.backend_status == "disconnected":
         st.error(f"❌ BACKEND DISCONNECTED | {st.session_state.backend_url}")
-    else:
-        st.warning("🔄 Checking backend connection...")
     
     st.divider()
     
-    # Live matches section
-    if MOCK_LIVE:
-        st.subheader("🔴 LIVE NOW")
-        for live in MOCK_LIVE:
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                st.markdown(f"**{live['home']} {live['home_score']} - {live['away_score']} {live['away']}**")
-                st.caption(live['league'])
-            with col2:
-                st.markdown(f"**{live['time']}**")
-            with col3:
-                st.markdown("🔴 LIVE")
-            st.divider()
-    
     # Group fixtures by league
-    grouped_fixtures = group_fixtures_by_league(MOCK_FIXTURES)
+    st.subheader("🏆 League of Ireland")
     
-    for league, fixtures in grouped_fixtures.items():
-        st.subheader(f"🏆 {league}")
+    for fixture in MOCK_FIXTURES:
+        # Determine status color/icon
+        fid = fixture['id']
+        fdata = FORENSIC_DATA.get(fid, {})
         
-        for fixture in fixtures:
-            col1, col2, col3, col4, col5 = st.columns([2.5, 1, 1, 1, 0.8])
-            
-            with col1:
-                st.markdown(f"**{fixture['home']} vs {fixture['away']}**")
-            with col2:
-                st.markdown(f"**{fixture['time']}**")
-                st.caption("Kickoff")
-            with col3:
-                st.markdown(f"**{fixture['odds']:.2f}**")
-                st.caption("Odds")
-            with col4:
-                edge = (1/fixture['odds'] - 0.45) * 100
-                edge_color = "🟢" if edge > 0 else "🔴"
-                st.markdown(f"{edge_color} **{abs(edge):.1f}%**")
-                st.caption("Edge")
-            with col5:
-                if st.button("🔍", key=f"btn_{fixture['id']}", help="View forensic report"):
-                    st.session_state.selected_fixture = fixture
-                    navigate_to("forensic")
-            st.divider()
+        if fdata.get("status") == "APPROVED":
+            status_icon = "✅"
+            status_color = "green"
+        elif fdata.get("m8_conflict"):
+            status_icon = "🚨"
+            status_color = "red"
+        elif fdata.get("edge", 0) < 0:
+            status_icon = "⚠️"
+            status_color = "orange"
+        else:
+            status_icon = "❓"
+            status_color = "gray"
+        
+        col1, col2, col3, col4, col5, col6 = st.columns([2.5, 1, 0.8, 0.8, 1, 0.8])
+        
+        with col1:
+            st.markdown(f"**{status_icon} {fixture['home']} vs {fixture['away']}**")
+        with col2:
+            st.write(fixture['time'])
+        with col3:
+            st.write(f"{fixture['odds']:.2f}")
+        with col4:
+            edge = fixture.get('edge', 0)
+            edge_color = "🟢" if edge > 0 else "🔴" if edge < 0 else "⚪"
+            st.write(f"{edge_color} {abs(edge):.1f}%")
+        with col5:
+            st.write(f"{fixture['prob']}%")
+        with col6:
+            if st.button("🔍", key=f"btn_{fixture['id']}", help="View forensic report"):
+                st.session_state.selected_fixture = fixture
+                navigate_to("forensic")
+        st.divider()
     
-    if not MOCK_FIXTURES and not MOCK_LIVE:
-        st.info("No fixtures scheduled for today.")
+    # Top Picks Summary
+    st.subheader("🏆 Top Picks (Ranked)")
+    approved_fixtures = [f for f in MOCK_FIXTURES if FORENSIC_DATA.get(f['id'], {}).get("status") == "APPROVED"]
+    
+    if approved_fixtures:
+        for i, fixture in enumerate(approved_fixtures, 1):
+            fdata = FORENSIC_DATA.get(fixture['id'], {})
+            stake = fdata.get('stake', 0)
+            col1, col2, col3, col4 = st.columns([2, 1, 1, 1.5])
+            with col1:
+                st.write(f"**#{i} {fixture['home']} vs {fixture['away']}**")
+            with col2:
+                st.write(f"{fixture['selection']} @ {fixture['odds']:.2f}")
+            with col3:
+                st.write(f"{fixture['prob']}% prob")
+            with col4:
+                st.write(f"Stake: £{stake:.2f}")
+            st.divider()
+    else:
+        st.info("No approved picks for today")
 
-# ========== PERFORMANCE PAGE ==========
+# ========== OTHER PAGES (simplified for brevity) ==========
 def show_performance():
     st.title("📈 Performance Metrics")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Calibration Grade", "B", "Good")
-    with col2:
-        st.metric("Brier Score", "0.187", "0=perfect")
-    with col3:
-        st.metric("ECE", "0.094", "0=perfect")
-    st.divider()
-    
-    st.subheader("Accuracy by Confidence Level")
-    acc_data = pd.DataFrame({"Confidence": ["HIGH", "MEDIUM", "LOW"], "Accuracy": [68, 52, 48]})
-    fig = px.bar(acc_data, x="Confidence", y="Accuracy", color="Confidence", text="Accuracy")
-    fig.update_layout(height=400)
-    st.plotly_chart(fig, use_container_width=True)
-    st.divider()
-    
-    st.subheader("Performance by League")
     st.dataframe(pd.DataFrame(LEAGUE_STATS), use_container_width=True, hide_index=True)
-    st.divider()
-    
-    st.subheader("ROI Trend")
-    roi_data = pd.DataFrame([
-        {"month": "Jan", "roi": 2.1}, {"month": "Feb", "roi": 3.5},
-        {"month": "Mar", "roi": 4.2}, {"month": "Apr", "roi": 5.8},
-        {"month": "May", "roi": 7.1}, {"month": "Jun", "roi": 12.4},
-    ])
-    fig = px.line(roi_data, x="month", y="roi", markers=True)
-    fig.update_layout(height=400)
-    st.plotly_chart(fig, use_container_width=True)
 
-# ========== BANKROLL PAGE ==========
 def show_bankroll():
     st.title("💰 Bankroll Manager")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Current Bankroll", "$12,450", "-$750")
-    with col2:
-        st.metric("Peak Bankroll", "$13,200", "")
-    with col3:
-        st.metric("Drawdown", "5.7%", "↓")
-    with col4:
-        st.metric("Stake Multiplier", "0.85x", "Reduced")
-    st.divider()
-    
-    st.subheader("Bankroll History")
     fig = px.line(pd.DataFrame(BANKROLL_HISTORY), x="date", y="bankroll", markers=True)
     fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
-    st.divider()
-    
-    st.subheader("Active Stakes")
-    stakes_data = pd.DataFrame([
-        {"Match": "Arsenal vs Chelsea", "Stake": "$127.50", "Odds": 2.10, "Potential": "$267.75"},
-        {"Match": "Bayern vs Dortmund", "Stake": "$150.00", "Odds": 1.75, "Potential": "$262.50"},
-        {"Match": "Inter vs Juventus", "Stake": "$100.00", "Odds": 2.05, "Potential": "$205.00"},
-    ])
-    st.dataframe(stakes_data, use_container_width=True, hide_index=True)
 
-# ========== TOP PICKS PAGE ==========
 def show_top_picks():
     st.title("🏆 Top Picks")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    for i, pick in enumerate(TOP_PICKS, 1):
-        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-        with col1:
-            st.markdown(f"**#{i} {pick['match']}**")
-        with col2:
-            st.write(f"{pick['selection']} @ {pick['odds']:.2f}")
-        with col3:
-            st.write(f"{pick['prob']}% prob")
-        with col4:
-            st.write(f"+{pick['edge']}% edge")
-        st.divider()
-    st.info("Top picks are based on highest model probability and edge.")
+    for fixture in MOCK_FIXTURES:
+        fdata = FORENSIC_DATA.get(fixture['id'], {})
+        if fdata.get("status") == "APPROVED":
+            st.write(f"**{fixture['home']} vs {fixture['away']}** - {fixture['selection']} @ {fixture['odds']:.2f}")
 
-# ========== PARLAYS PAGE ==========
 def show_parlays():
     st.title("🔗 Parlay Builder")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    st.markdown("### 🟢 Ultra Safe Parlay")
-    st.markdown(f"**{' + '.join(PARLAYS['safe']['legs'])} = {PARLAYS['safe']['odds']:.2f}x**")
-    st.caption(f"Combined Probability: {PARLAYS['safe']['prob']}% | Stake: 3% of bankroll")
-    st.divider()
-    
-    st.markdown("### 🟡 Balanced Parlay")
-    st.markdown(f"**{' + '.join(PARLAYS['balanced']['legs'])} = {PARLAYS['balanced']['odds']:.2f}x**")
-    st.caption(f"Combined Probability: {PARLAYS['balanced']['prob']}% | Stake: 2% of bankroll")
-    st.divider()
-    
-    st.markdown("### 🔴 Aggressive Parlay")
-    st.markdown(f"**{' + '.join(PARLAYS['aggressive']['legs'])} = {PARLAYS['aggressive']['odds']:.2f}x**")
-    st.caption(f"Combined Probability: {PARLAYS['aggressive']['prob']}% | Stake: 1% of bankroll")
+    st.info("Parlay builder coming soon")
 
-# ========== ALL LEGS PAGE ==========
 def show_all_legs():
-    st.title("📋 All Legs Analyzed")
+    st.title("📋 All Legs")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    search = st.text_input("🔍 Search", placeholder="Team or league...")
-    fixtures = MOCK_FIXTURES
-    if search:
-        s = search.lower()
-        fixtures = [f for f in fixtures if s in f['home'].lower() or s in f['away'].lower() or s in f['league'].lower()]
-    
-    st.caption(f"Showing {len(fixtures)} legs")
-    for fixture in fixtures:
-        col1, col2, col3, col4 = st.columns([2.5, 1.5, 1, 1])
-        with col1:
-            st.write(f"**{fixture['home']} vs {fixture['away']}**")
-        with col2:
-            st.write(fixture['league'])
-        with col3:
-            st.write(fixture['time'])
-        with col4:
-            if st.button("🔍 View", key=f"view_{fixture['id']}"):
-                st.session_state.selected_fixture = fixture
-                navigate_to("forensic")
-        st.divider()
+    for fixture in MOCK_FIXTURES:
+        st.write(f"{fixture['home']} vs {fixture['away']} - {fixture['league']} - {fixture['time']}")
 
-# ========== COUNTRIES PAGE ==========
 def show_countries():
     st.title("🌍 Country Explorer")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    for country in COUNTRIES:
-        with st.expander(f"{country['flag']} {country['name']}"):
-            for league in country['leagues']:
-                st.write(f"• {league}")
+    st.info("Country explorer coming soon")
 
-# ========== CALENDAR PAGE ==========
 def show_calendar():
     st.title("📅 Oracle Calendar")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
-    date = st.date_input("Select Date", datetime.now().date())
-    if st.button("🔍 Scan Selected Date"):
-        with st.spinner("Scanning fixtures..."):
-            import time
-            time.sleep(1)
-            st.success(f"Scan complete for {date}")
-            st.info(f"Found 12 fixtures on {date}")
-    
-    st.markdown("### 📊 Recent Activity")
-    for fixture in MOCK_FIXTURES[:5]:
-        st.write(f"📅 {datetime.now().strftime('%b %d')} | {fixture['home']} vs {fixture['away']} - {fixture['league']}")
+    st.date_input("Select Date", datetime.now().date())
 
-# ========== SETTINGS PAGE ==========
 def show_settings():
     st.title("⚙️ Settings")
     if st.button("← Back"):
         navigate_to("dashboard")
     st.divider()
-    
     st.markdown("### Backend Configuration")
-    backend_url_input = st.text_input(
-        "Backend URL", 
-        value=st.session_state.backend_url,
-        help="Your deployed backend URL on Render"
-    )
-    
-    if st.button("Test Connection", use_container_width=True):
-        with st.spinner("Testing connection..."):
-            connected, data = test_backend_connection(backend_url_input)
-            if connected:
-                st.session_state.backend_url = backend_url_input
-                st.session_state.backend_status = "connected"
-                st.success(f"✅ Connected to {backend_url_input}")
-                st.json(data)
-            else:
-                st.session_state.backend_status = "disconnected"
-                st.error(f"❌ Cannot connect to {backend_url_input}")
-    
-    st.markdown("---")
-    st.markdown("### Data Source")
-    if st.session_state.backend_status == "connected":
-        st.success("📡 Using BACKEND data")
-    else:
-        st.info("📊 Using DEMO DATA (backend not connected)")
-    
-    st.markdown("---")
-    st.markdown("### API Configuration")
-    api_key = st.text_input("API-Football Key", type="password", placeholder="Enter your API key")
-    if api_key:
-        st.success("API key saved")
-    
-    st.markdown("### Thresholds")
-    st.slider("Home Win Threshold", 0.50, 0.70, 0.57, 0.01)
-    st.slider("Minimum Edge", 0.00, 0.15, 0.04, 0.01)
-    
-    st.markdown("### Timezone")
-    st.info("📍 GMT+3 (Nairobi)")
+    st.text_input("Backend URL", value=st.session_state.backend_url, disabled=True)
+    if st.button("Test Connection"):
+        check_backend()
+        if st.session_state.backend_status == "connected":
+            st.success("✅ Connected!")
+        else:
+            st.error("❌ Not connected")
 
 # ========== MAIN ==========
 def main():
-    # Sidebar
     with st.sidebar:
         st.markdown("### 🎯 MATCH ORACLE")
-        
-        # Backend Status Indicator (prominent)
         st.markdown("---")
+        
+        # Backend Status
         if st.session_state.backend_status == "connected":
-            st.success(f"🟢 BACKEND ONLINE")
-            st.caption(f"📍 {st.session_state.backend_url}")
-        elif st.session_state.backend_status == "disconnected":
-            st.error("🔴 BACKEND OFFLINE")
-            st.caption("Check Settings to configure")
+            st.success("🟢 BACKEND ONLINE")
         else:
-            st.warning("🟡 CHECKING BACKEND...")
-        
-        st.markdown("---")
-        
-        # API Key section
-        with st.expander("🔑 API Keys", expanded=False):
-            st.markdown("**Get free keys from:**")
-            st.markdown("- [API-Football](https://api-football.com/)")
-            st.markdown("- [The Odds API](https://the-odds-api.com/)")
-            key_input = st.text_input("API-Football Key", type="password", placeholder="Enter your key", key="api_key_input")
-            if key_input:
-                st.session_state.football_key = key_input
-                st.success("✅ Key saved")
+            st.error("🔴 BACKEND OFFLINE")
         
         st.markdown("---")
         
