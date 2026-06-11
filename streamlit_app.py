@@ -20,48 +20,36 @@ NAIROBI_TZ = pytz.timezone('Africa/Nairobi')
 # ========== BLACK/GOLD THEME CSS ==========
 st.markdown("""
 <style>
-    /* Main background */
     .stApp {
         background: linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 100%);
     }
-    
-    /* Gold headers */
     .gold-header {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 800;
         background: linear-gradient(135deg, #FFD700, #FFA500);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0;
     }
-    
     .gold-subheader {
-        font-size: 1rem;
+        font-size: 0.9rem;
         color: #B8860B;
         margin-bottom: 1rem;
         border-left: 3px solid #FFD700;
         padding-left: 1rem;
     }
-    
-    /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
-    /* Compact progress bar */
     .stProgress > div > div {
         height: 4px;
     }
-    
-    /* Smaller button */
-    .stButton button {
-        padding: 0.2rem 0.5rem;
-        font-size: 0.7rem;
-    }
-    
-    /* Compact metric spacing */
     div[data-testid="column"] {
         padding: 0 0.2rem;
+    }
+    hr {
+        margin: 0.15rem 0;
+        border-color: #2a2a2a;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -104,41 +92,141 @@ def test_backend_connection(backend_url):
 
 # ========== MATCH DATA ==========
 MATCHES = [
-    {"id": 1, "home": "Wexford Youths", "away": "Cork City", "league": "League of Ireland", "tier": 2,
-     "time": "19:45", "venue": "Ferrycarrig Park", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
-     "selection": "Cork City", "selection_odds": 2.36, "prob": 62, "edge": 4.2, "confidence": "HIGH", "status": "APPROVED"},
-    {"id": 2, "home": "Derry City", "away": "Bohemians FC", "league": "League of Ireland", "tier": 2,
-     "time": "19:45", "venue": "Ryan McBride Brandywell", "home_odds": 2.90, "draw_odds": 3.20, "away_odds": 2.36,
-     "selection": "Bohemians FC", "selection_odds": 2.36, "prob": 54, "edge": 2.3, "confidence": "HIGH", "status": "REJECTED",
-     "rejection_reason": "H2H CONFLICT"},
-    {"id": 3, "home": "Shamrock Rovers", "away": "Shelbourne FC", "league": "League of Ireland", "tier": 2,
-     "time": "19:45", "venue": "Tallaght Stadium", "home_odds": 1.33, "draw_odds": 4.50, "away_odds": 6.00,
-     "selection": "Shamrock Rovers", "selection_odds": 1.33, "prob": 68, "edge": -7.2, "confidence": "HIGH", "status": "REJECTED",
-     "rejection_reason": "Negative Edge"},
-    {"id": 4, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "tier": 1,
-     "time": "15:00", "venue": "Johan Cruijff ArenA", "home_odds": 1.85, "draw_odds": 3.70, "away_odds": 3.90,
-     "selection": "Ajax", "selection_odds": 1.85, "prob": 57, "edge": 5.1, "confidence": "HIGH", "status": "APPROVED"},
+    {
+        "id": 1,
+        "home": "Wexford Youths",
+        "away": "Cork City",
+        "league": "League of Ireland",
+        "tier": 2,
+        "time": "19:45",
+        "venue": "Ferrycarrig Park",
+        "home_odds": 2.90,
+        "draw_odds": 3.20,
+        "away_odds": 2.36,
+        "selection": "Cork City",
+        "selection_odds": 2.36,
+        "prob": 62,
+        "edge": 4.2,
+        "confidence": "HIGH",
+        "status": "APPROVED"
+    },
+    {
+        "id": 2,
+        "home": "Derry City",
+        "away": "Bohemians FC",
+        "league": "League of Ireland",
+        "tier": 2,
+        "time": "19:45",
+        "venue": "Ryan McBride Brandywell",
+        "home_odds": 2.90,
+        "draw_odds": 3.20,
+        "away_odds": 2.36,
+        "selection": "Bohemians FC",
+        "selection_odds": 2.36,
+        "prob": 54,
+        "edge": 2.3,
+        "confidence": "HIGH",
+        "status": "REJECTED",
+        "rejection_reason": "H2H CONFLICT"
+    },
+    {
+        "id": 3,
+        "home": "Shamrock Rovers",
+        "away": "Shelbourne FC",
+        "league": "League of Ireland",
+        "tier": 2,
+        "time": "19:45",
+        "venue": "Tallaght Stadium",
+        "home_odds": 1.33,
+        "draw_odds": 4.50,
+        "away_odds": 6.00,
+        "selection": "Shamrock Rovers",
+        "selection_odds": 1.33,
+        "prob": 68,
+        "edge": -7.2,
+        "confidence": "HIGH",
+        "status": "REJECTED",
+        "rejection_reason": "Negative Edge"
+    },
+    {
+        "id": 4,
+        "home": "Ajax",
+        "away": "Feyenoord",
+        "league": "Eredivisie",
+        "tier": 1,
+        "time": "15:00",
+        "venue": "Johan Cruijff ArenA",
+        "home_odds": 1.85,
+        "draw_odds": 3.70,
+        "away_odds": 3.90,
+        "selection": "Ajax",
+        "selection_odds": 1.85,
+        "prob": 57,
+        "edge": 5.1,
+        "confidence": "HIGH",
+        "status": "APPROVED"
+    }
 ]
 
 FORENSIC_DATA = {
-    1: {"status": "APPROVED", "verdict_reason": "Clear value: model 62% vs market implied 58%",
-        "leg_data": {"country": "Ireland", "league": "League of Ireland", "venue": "Ferrycarrig Park", "kickoff": "2025-06-11 19:45",
-                     "home_form": "L D W L L", "away_form": "W W D L W", "home_position": 8, "away_position": 3",
-                     "home_points": 24, "away_points": 38,
-                     "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%", "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"},
-        "stake": 33.50, "bankroll": 1000},
-    2: {"status": "REJECTED", "verdict_reason": "H2H CONFLICT: Historical favours Derry, current season favours Bohemians",
-        "leg_data": {"country": "Ireland", "league": "League of Ireland", "venue": "Ryan McBride Brandywell", "kickoff": "2025-06-11 19:45",
-                     "home_form": "L L W D L", "away_form": "W W D W L", "home_position": 6, "away_position": 2",
-                     "home_points": 28, "away_points": 42,
-                     "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%", "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"},
-        "stake": 0},
-    3: {"status": "REJECTED", "verdict_reason": "Negative edge: model 68% vs market 75%",
-        "leg_data": {"country": "Ireland", "league": "League of Ireland", "venue": "Tallaght Stadium", "kickoff": "2025-06-11 19:45",
-                     "home_form": "W W D W L", "away_form": "L L D L W", "home_position": 1, "away_position": 7",
-                     "home_points": 52, "away_points": 28,
-                     "h2h_record": "Shamrock 65% | Draw 20% | Shelbourne 15%", "h2h_last6": "Shamrock 4 | Draw 1 | Shelbourne 1"},
-        "stake": 0},
+    1: {
+        "status": "APPROVED",
+        "verdict_reason": "Clear value: model 62% vs market implied 58%",
+        "leg_data": {
+            "country": "Ireland",
+            "league": "League of Ireland",
+            "venue": "Ferrycarrig Park",
+            "kickoff": "2025-06-11 19:45",
+            "home_form": "L D W L L",
+            "away_form": "W W D L W",
+            "home_position": 8,
+            "away_position": 3,
+            "home_points": 24,
+            "away_points": 38,
+            "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%",
+            "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"
+        },
+        "stake": 33.50,
+        "bankroll": 1000
+    },
+    2: {
+        "status": "REJECTED",
+        "verdict_reason": "H2H CONFLICT: Historical favours Derry, current season favours Bohemians",
+        "leg_data": {
+            "country": "Ireland",
+            "league": "League of Ireland",
+            "venue": "Ryan McBride Brandywell",
+            "kickoff": "2025-06-11 19:45",
+            "home_form": "L L W D L",
+            "away_form": "W W D W L",
+            "home_position": 6,
+            "away_position": 2,
+            "home_points": 28,
+            "away_points": 42,
+            "h2h_record": "Derry 46% | Draw 30% | Bohemians 24%",
+            "h2h_last6": "Derry 2 | Draw 3 | Bohemians 1"
+        },
+        "stake": 0
+    },
+    3: {
+        "status": "REJECTED",
+        "verdict_reason": "Negative edge: model 68% vs market 75%",
+        "leg_data": {
+            "country": "Ireland",
+            "league": "League of Ireland",
+            "venue": "Tallaght Stadium",
+            "kickoff": "2025-06-11 19:45",
+            "home_form": "W W D W L",
+            "away_form": "L L D L W",
+            "home_position": 1,
+            "away_position": 7,
+            "home_points": 52,
+            "away_points": 28,
+            "h2h_record": "Shamrock 65% | Draw 20% | Shelbourne 15%",
+            "h2h_last6": "Shamrock 4 | Draw 1 | Shelbourne 1"
+        },
+        "stake": 0
+    }
 }
 
 # ========== SESSION STATE ==========
@@ -192,7 +280,7 @@ def show_match_card(match):
     prob = match.get('prob', 50)
     
     with st.container():
-        st.markdown("""<hr style="margin: 0.15rem 0; border-color: #2a2a2a;">""", unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
         
         # Row 1: League, status, time
         c1, c2, c3 = st.columns([2, 1, 1])
@@ -358,9 +446,9 @@ def show_dashboard():
     st.markdown('<p class="gold-subheader">AI-Powered Football Intelligence • Elite Betting Analysis</p>', unsafe_allow_html=True)
     
     if st.session_state.backend_status == "connected":
-        st.success(f"✅ BACKEND ONLINE")
+        st.success("✅ BACKEND ONLINE")
     else:
-        st.warning(f"⚠️ BACKEND OFFLINE - Using demo data")
+        st.warning("⚠️ BACKEND OFFLINE - Using demo data")
     
     st.markdown(f"## 📅 Today's Fixtures")
     st.caption(f"{len(MATCHES)} matches • {datetime.now(NAIROBI_TZ).strftime('%A, %B %d, %Y')}")
