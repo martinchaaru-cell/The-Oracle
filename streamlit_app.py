@@ -13,25 +13,34 @@ st.set_page_config(
 )
 
 # ========== API KEY CONFIGURATION ==========
-def get_api_keys():
-    """Get API keys from secrets or session state"""
+def get_backend_url():
+    """Get backend URL from secrets or session state"""
     try:
-        football_key = st.secrets.get("APIFOOTBALL_KEY", "")
-        odds_key = st.secrets.get("ODDS_API_KEY", "")
         backend_url = st.secrets.get("BACKEND_URL", "")
-        if football_key:
-            return football_key, odds_key, backend_url
+        if backend_url:
+            return backend_url
     except:
         pass
     
-    football_key = st.session_state.get("football_key", "")
-    odds_key = st.session_state.get("odds_key", "")
-    backend_url = st.session_state.get("backend_url", "https://oracle-backend-1-vryo.onrender.com")
-    
-    return football_key, odds_key, backend_url
+    return st.session_state.get("backend_url", "https://oracle-backend-1-vryo.onrender.com")
+
+def test_backend_connection(backend_url):
+    """Test if backend is reachable and healthy"""
+    try:
+        response = requests.get(f"{backend_url}/health", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == "healthy":
+                return True, data
+        return False, None
+    except requests.exceptions.ConnectionError:
+        return False, None
+    except requests.exceptions.Timeout:
+        return False, None
+    except Exception:
+        return False, None
 
 # ========== MOCK DATA ==========
-# Today's fixtures sorted by time (earliest first)
 MOCK_FIXTURES = [
     {"id": 1, "home": "Ajax", "away": "Feyenoord", "league": "Eredivisie", "time": "12:30", "odds": 1.85, "status": "NS"},
     {"id": 2, "home": "Arsenal", "away": "Chelsea", "league": "Premier League", "time": "15:00", "odds": 2.10, "status": "NS"},
@@ -42,12 +51,10 @@ MOCK_FIXTURES = [
     {"id": 7, "home": "Real Madrid", "away": "Barcelona", "league": "La Liga", "time": "20:00", "odds": 2.25, "status": "NS"},
 ]
 
-# Live matches
 MOCK_LIVE = [
     {"id": 8, "home": "AC Milan", "away": "Roma", "league": "Serie A", "time": "LIVE 67'", "home_score": 2, "away_score": 1, "status": "LIVE"},
 ]
 
-# League stats
 LEAGUE_STATS = [
     {"league": "Premier League", "count": 12, "accuracy": 62, "roi": 15.2},
     {"league": "La Liga", "count": 10, "accuracy": 58, "roi": 9.8},
@@ -56,7 +63,6 @@ LEAGUE_STATS = [
     {"league": "Ligue 1", "count": 6, "accuracy": 61, "roi": 13.4},
 ]
 
-# Bankroll history
 BANKROLL_HISTORY = [
     {"date": "Jun 1", "bankroll": 10000}, {"date": "Jun 2", "bankroll": 10250},
     {"date": "Jun 3", "bankroll": 10500}, {"date": "Jun 4", "bankroll": 10300},
@@ -64,21 +70,18 @@ BANKROLL_HISTORY = [
     {"date": "Jun 7", "bankroll": 11800}, {"date": "Jun 8", "bankroll": 12450},
 ]
 
-# Top picks
 TOP_PICKS = [
     {"match": "Arsenal vs Chelsea", "selection": "Arsenal", "odds": 2.10, "prob": 62, "edge": 8.1},
     {"match": "Bayern vs Dortmund", "selection": "Bayern", "odds": 1.75, "prob": 58, "edge": 6.7},
     {"match": "Inter vs Juventus", "selection": "Inter", "odds": 2.05, "prob": 55, "edge": 4.2},
 ]
 
-# Parlays
 PARLAYS = {
     "safe": {"legs": ["Arsenal (2.10)", "Bayern (1.75)"], "odds": 3.68, "prob": 36},
     "balanced": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "PSG (1.55)"], "odds": 5.70, "prob": 22},
     "aggressive": {"legs": ["Arsenal (2.10)", "Bayern (1.75)", "Inter (2.05)", "Ajax (1.85)"], "odds": 13.95, "prob": 11},
 }
 
-# Countries data
 COUNTRIES = [
     {"flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "name": "England", "leagues": ["Premier League", "Championship", "League One"]},
     {"flag": "🇪🇸", "name": "Spain", "leagues": ["La Liga", "Segunda Division"]},
@@ -94,7 +97,6 @@ COUNTRIES = [
 
 # ========== HELPER FUNCTIONS ==========
 def group_fixtures_by_league(fixtures):
-    """Group fixtures by league and sort by time"""
     grouped = {}
     for f in fixtures:
         league = f['league']
@@ -110,6 +112,29 @@ if "page" not in st.session_state:
     st.session_state.page = "dashboard"
 if "selected_fixture" not in st.session_state:
     st.session_state.selected_fixture = None
+if "backend_status" not in st.session_state:
+    st.session_state.backend_status = "checking"
+if "backend_url" not in st.session_state:
+    st.session_state.backend_url = get_backend_url()
+if "backend_data" not in st.session_state:
+    st.session_state.backend_data = None
+
+# ========== CHECK BACKEND ON STARTUP ==========
+def check_backend():
+    """Check backend connection and update status"""
+    backend_url = st.session_state.backend_url
+    connected, data = test_backend_connection(backend_url)
+    
+    if connected:
+        st.session_state.backend_status = "connected"
+        st.session_state.backend_data = data
+    else:
+        st.session_state.backend_status = "disconnected"
+        st.session_state.backend_data = None
+
+# Run backend check on first load
+if st.session_state.backend_status == "checking":
+    check_backend()
 
 # ========== PAGE ROUTING ==========
 def navigate_to(page):
@@ -145,7 +170,6 @@ def show_forensic_report(fixture):
     with tab2:
         st.markdown("### M4: Pre-filter (6/8 passed)")
         st.progress(0.75)
-        
         st.markdown("### M5: Forensic Failures")
         st.metric("Total Failure Score", "2.5 / 4.5", "PASS")
         
@@ -163,27 +187,30 @@ def show_forensic_report(fixture):
         
         st.markdown("### M8: Dual Pattern")
         st.info("Risk Level: LOW | Underdog Threat: NONE")
-        
         st.markdown("### M9: Underdog Scanner")
         st.metric("Underdog Edge", "-2.1%", "No value")
-        
         st.markdown("### M10: Tally Matrix")
         st.success("Bilateral Prediction: HOME (HIGH confidence)")
-        
         st.markdown("### M26: Match Context")
         st.write("🏆 London Derby | Importance: 72%")
-        
         st.markdown("### M27: H2H Analysis")
         st.write("H2H Score: 78/100 (FAV_EDGE)")
         st.write("Games: 48 | Fav 29 | Draw 11 | Und 8")
-        
         st.divider()
         st.success("✅ FINAL VERDICT: APPROVED (HIGH confidence)")
 
 # ========== DASHBOARD PAGE ==========
 def show_dashboard():
     st.title("🎯 MATCH ORACLE")
-    st.caption(f"📅 {datetime.now().strftime('%A, %B %d, %Y')} | Live football intelligence")
+    st.caption(f"📅 {datetime.now().strftime('%A, %B %d, %Y')}")
+    
+    # ===== BACKEND STATUS BANNER =====
+    if st.session_state.backend_status == "connected":
+        st.success(f"✅ BACKEND CONNECTED | {st.session_state.backend_url}")
+    elif st.session_state.backend_status == "disconnected":
+        st.error(f"❌ BACKEND DISCONNECTED | {st.session_state.backend_url}")
+    else:
+        st.warning("🔄 Checking backend connection...")
     
     st.divider()
     
@@ -212,27 +239,21 @@ def show_dashboard():
             
             with col1:
                 st.markdown(f"**{fixture['home']} vs {fixture['away']}**")
-            
             with col2:
                 st.markdown(f"**{fixture['time']}**")
                 st.caption("Kickoff")
-            
             with col3:
                 st.markdown(f"**{fixture['odds']:.2f}**")
                 st.caption("Odds")
-            
             with col4:
-                # Calculate edge
                 edge = (1/fixture['odds'] - 0.45) * 100
                 edge_color = "🟢" if edge > 0 else "🔴"
                 st.markdown(f"{edge_color} **{abs(edge):.1f}%**")
                 st.caption("Edge")
-            
             with col5:
                 if st.button("🔍", key=f"btn_{fixture['id']}", help="View forensic report"):
                     st.session_state.selected_fixture = fixture
                     navigate_to("forensic")
-            
             st.divider()
     
     if not MOCK_FIXTURES and not MOCK_LIVE:
@@ -241,10 +262,8 @@ def show_dashboard():
 # ========== PERFORMANCE PAGE ==========
 def show_performance():
     st.title("📈 Performance Metrics")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     col1, col2, col3 = st.columns(3)
@@ -254,25 +273,17 @@ def show_performance():
         st.metric("Brier Score", "0.187", "0=perfect")
     with col3:
         st.metric("ECE", "0.094", "0=perfect")
-    
     st.divider()
     
     st.subheader("Accuracy by Confidence Level")
-    acc_data = pd.DataFrame({
-        "Confidence": ["HIGH", "MEDIUM", "LOW"],
-        "Accuracy": [68, 52, 48],
-        "Bets": [145, 89, 67]
-    })
+    acc_data = pd.DataFrame({"Confidence": ["HIGH", "MEDIUM", "LOW"], "Accuracy": [68, 52, 48]})
     fig = px.bar(acc_data, x="Confidence", y="Accuracy", color="Confidence", text="Accuracy")
     fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
-    
     st.divider()
     
     st.subheader("Performance by League")
-    league_df = pd.DataFrame(LEAGUE_STATS)
-    st.dataframe(league_df, use_container_width=True, hide_index=True)
-    
+    st.dataframe(pd.DataFrame(LEAGUE_STATS), use_container_width=True, hide_index=True)
     st.divider()
     
     st.subheader("ROI Trend")
@@ -288,10 +299,8 @@ def show_performance():
 # ========== BANKROLL PAGE ==========
 def show_bankroll():
     st.title("💰 Bankroll Manager")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     col1, col2, col3, col4 = st.columns(4)
@@ -303,15 +312,12 @@ def show_bankroll():
         st.metric("Drawdown", "5.7%", "↓")
     with col4:
         st.metric("Stake Multiplier", "0.85x", "Reduced")
-    
     st.divider()
     
     st.subheader("Bankroll History")
-    history_df = pd.DataFrame(BANKROLL_HISTORY)
-    fig = px.line(history_df, x="date", y="bankroll", markers=True)
+    fig = px.line(pd.DataFrame(BANKROLL_HISTORY), x="date", y="bankroll", markers=True)
     fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
-    
     st.divider()
     
     st.subheader("Active Stakes")
@@ -325,10 +331,8 @@ def show_bankroll():
 # ========== TOP PICKS PAGE ==========
 def show_top_picks():
     st.title("🏆 Top Picks")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     for i, pick in enumerate(TOP_PICKS, 1):
@@ -342,28 +346,23 @@ def show_top_picks():
         with col4:
             st.write(f"+{pick['edge']}% edge")
         st.divider()
-    
     st.info("Top picks are based on highest model probability and edge.")
 
 # ========== PARLAYS PAGE ==========
 def show_parlays():
     st.title("🔗 Parlay Builder")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     st.markdown("### 🟢 Ultra Safe Parlay")
     st.markdown(f"**{' + '.join(PARLAYS['safe']['legs'])} = {PARLAYS['safe']['odds']:.2f}x**")
     st.caption(f"Combined Probability: {PARLAYS['safe']['prob']}% | Stake: 3% of bankroll")
-    
     st.divider()
     
     st.markdown("### 🟡 Balanced Parlay")
     st.markdown(f"**{' + '.join(PARLAYS['balanced']['legs'])} = {PARLAYS['balanced']['odds']:.2f}x**")
     st.caption(f"Combined Probability: {PARLAYS['balanced']['prob']}% | Stake: 2% of bankroll")
-    
     st.divider()
     
     st.markdown("### 🔴 Aggressive Parlay")
@@ -373,21 +372,17 @@ def show_parlays():
 # ========== ALL LEGS PAGE ==========
 def show_all_legs():
     st.title("📋 All Legs Analyzed")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     search = st.text_input("🔍 Search", placeholder="Team or league...")
-    
     fixtures = MOCK_FIXTURES
     if search:
         s = search.lower()
         fixtures = [f for f in fixtures if s in f['home'].lower() or s in f['away'].lower() or s in f['league'].lower()]
     
     st.caption(f"Showing {len(fixtures)} legs")
-    
     for fixture in fixtures:
         col1, col2, col3, col4 = st.columns([2.5, 1.5, 1, 1])
         with col1:
@@ -405,10 +400,8 @@ def show_all_legs():
 # ========== COUNTRIES PAGE ==========
 def show_countries():
     st.title("🌍 Country Explorer")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     for country in COUNTRIES:
@@ -419,14 +412,11 @@ def show_countries():
 # ========== CALENDAR PAGE ==========
 def show_calendar():
     st.title("📅 Oracle Calendar")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
     date = st.date_input("Select Date", datetime.now().date())
-    
     if st.button("🔍 Scan Selected Date"):
         with st.spinner("Scanning fixtures..."):
             import time
@@ -441,19 +431,41 @@ def show_calendar():
 # ========== SETTINGS PAGE ==========
 def show_settings():
     st.title("⚙️ Settings")
-    
     if st.button("← Back"):
         navigate_to("dashboard")
-    
     st.divider()
     
-    st.markdown("### Data Source")
-    st.info("📊 Currently using DEMO DATA")
+    st.markdown("### Backend Configuration")
+    backend_url_input = st.text_input(
+        "Backend URL", 
+        value=st.session_state.backend_url,
+        help="Your deployed backend URL on Render"
+    )
     
+    if st.button("Test Connection", use_container_width=True):
+        with st.spinner("Testing connection..."):
+            connected, data = test_backend_connection(backend_url_input)
+            if connected:
+                st.session_state.backend_url = backend_url_input
+                st.session_state.backend_status = "connected"
+                st.success(f"✅ Connected to {backend_url_input}")
+                st.json(data)
+            else:
+                st.session_state.backend_status = "disconnected"
+                st.error(f"❌ Cannot connect to {backend_url_input}")
+    
+    st.markdown("---")
+    st.markdown("### Data Source")
+    if st.session_state.backend_status == "connected":
+        st.success("📡 Using BACKEND data")
+    else:
+        st.info("📊 Using DEMO DATA (backend not connected)")
+    
+    st.markdown("---")
     st.markdown("### API Configuration")
     api_key = st.text_input("API-Football Key", type="password", placeholder="Enter your API key")
     if api_key:
-        st.success("API key saved (demo mode)")
+        st.success("API key saved")
     
     st.markdown("### Thresholds")
     st.slider("Home Win Threshold", 0.50, 0.70, 0.57, 0.01)
@@ -461,18 +473,24 @@ def show_settings():
     
     st.markdown("### Timezone")
     st.info("📍 GMT+3 (Nairobi)")
-    
-    if st.button("Save Settings"):
-        st.success("Settings saved (demo mode)")
 
 # ========== MAIN ==========
 def main():
-    # Get API keys (for future use)
-    football_key, odds_key, backend_url = get_api_keys()
-    
-    # Sidebar - Main Menu
+    # Sidebar
     with st.sidebar:
         st.markdown("### 🎯 MATCH ORACLE")
+        
+        # Backend Status Indicator (prominent)
+        st.markdown("---")
+        if st.session_state.backend_status == "connected":
+            st.success(f"🟢 BACKEND ONLINE")
+            st.caption(f"📍 {st.session_state.backend_url}")
+        elif st.session_state.backend_status == "disconnected":
+            st.error("🔴 BACKEND OFFLINE")
+            st.caption("Check Settings to configure")
+        else:
+            st.warning("🟡 CHECKING BACKEND...")
+        
         st.markdown("---")
         
         # API Key section
@@ -480,26 +498,14 @@ def main():
             st.markdown("**Get free keys from:**")
             st.markdown("- [API-Football](https://api-football.com/)")
             st.markdown("- [The Odds API](https://the-odds-api.com/)")
-            
-            key_input = st.text_input(
-                "API-Football Key", 
-                type="password",
-                placeholder="Enter your key",
-                key="api_key_input"
-            )
+            key_input = st.text_input("API-Football Key", type="password", placeholder="Enter your key", key="api_key_input")
             if key_input:
                 st.session_state.football_key = key_input
                 st.success("✅ Key saved")
         
-        # Show key status
-        if football_key:
-            st.success(f"🔑 API Key: {football_key[:6]}...")
-        else:
-            st.warning("⚠️ No API Key")
-        
         st.markdown("---")
         
-        # Menu Items
+        # Menu
         st.markdown("**📋 TODAY**")
         if st.button("🏠 Today's Fixtures", use_container_width=True):
             navigate_to("dashboard")
@@ -527,17 +533,10 @@ def main():
             navigate_to("settings")
         
         st.markdown("---")
-        
-        # Status footer
         st.caption(f"🕐 {datetime.now().strftime('%H:%M:%S')} GMT+3")
-        if football_key:
-            st.caption("🔑 API: Configured")
-        else:
-            st.caption("📡 DEMO MODE")
     
     # Page routing
     page = st.session_state.page
-    
     if page == "dashboard":
         show_dashboard()
     elif page == "forensic":
