@@ -1,63 +1,163 @@
-# quick_test.py
-import requests
-import json
+"""DEBUG VERSION - Shows all errors"""
+import sys
+import traceback
 
-HIGHLIGHTLY_HOST = "sport-highlights-api.p.rapidapi.com"
-HIGHLIGHTLY_KEY = "b8c5a121-de03-40a2-825a-63f7407a961a"  # Replace with your actual key
-
-HEADERS = {
-    "x-rapidapi-host": HIGHLIGHTLY_HOST,
-    "x-rapidapi-key": HIGHLIGHTLY_KEY
-}
-
-def test_api():
-    print("Testing Highlightly API...")
+# Catch all errors and display them
+try:
+    import streamlit as st
+    import requests
+    import pandas as pd
+    from datetime import datetime, timedelta
+    import os
     
-    # Test 1: Get countries
-    print("\n1. Fetching countries...")
-    url = f"https://{HIGHLIGHTLY_HOST}/football/countries"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        data = response.json()
-        print(f"   ✅ Success! Found {len(data.get('data', []))} countries")
-    else:
-        print(f"   ❌ Failed: {response.status_code}")
-        print(f"   {response.text}")
-        return False
+    # Page config MUST be the first Streamlit command
+    st.set_page_config(
+        page_title="Highlightly API Tester",
+        page_icon="🏈",
+        layout="wide"
+    )
     
-    # Test 2: Search for Vikingur Gota
-    print("\n2. Searching for Vikingur Gota...")
-    url = f"https://{HIGHLIGHTLY_HOST}/football/teams"
-    params = {"name": "Vikingur"}
-    response = requests.get(url, headers=HEADERS, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        teams = data.get("data", [])
-        print(f"   ✅ Found {len(teams)} teams")
-        for team in teams[:3]:
-            print(f"      - {team.get('name')} (ID: {team.get('id')})")
-    else:
-        print(f"   ❌ Failed: {response.status_code}")
+    # Display that app is loading
+    st.write("🚀 App is loading...")
     
-    # Test 3: Get today's matches
-    print("\n3. Fetching today's matches...")
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
-    params = {"date": today, "limit": 5}
-    response = requests.get(url, headers=HEADERS, params=params)
-    if response.status_code == 200:
-        data = response.json()
-        matches = data.get("data", [])
-        print(f"   ✅ Found {len(matches)} matches today")
-        for match in matches[:3]:
-            home = match.get("homeTeam", {}).get("name", "?")
-            away = match.get("awayTeam", {}).get("name", "?")
-            league = match.get("league", {}).get("name", "?")
-            print(f"      - {home} vs {away} ({league})")
-    else:
-        print(f"   ❌ Failed: {response.status_code}")
+    # ============================================
+    # GET API KEY
+    # ============================================
     
-    return True
-
-if __name__ == "__main__":
-    test_api()
+    def get_api_key():
+        """Get API key from various sources"""
+        # Try Streamlit secrets
+        try:
+            if "HIGHLIGHTLY_API_KEY" in st.secrets:
+                return st.secrets["HIGHLIGHTLY_API_KEY"]
+        except:
+            pass
+        
+        # Try environment variables
+        env_key = os.environ.get("HIGHLIGHTLY_API_KEY")
+        if env_key:
+            return env_key
+        
+        return None
+    
+    # Show loading status
+    st.write("🔑 Checking API key...")
+    
+    HIGHLIGHTLY_KEY = get_api_key()
+    
+    # Sidebar
+    with st.sidebar:
+        st.header("🔑 API Status")
+        
+        if HIGHLIGHTLY_KEY:
+            st.success("✅ API Key Loaded")
+            masked = f"{HIGHLIGHTLY_KEY[:8]}...{HIGHLIGHTLY_KEY[-4:]}"
+            st.code(masked, language="text")
+        else:
+            st.error("❌ API Key Not Found")
+            st.info("""
+            **Add your API key:**
+            1. Go to Settings → Secrets
+            2. Add: `HIGHLIGHTLY_API_KEY = "your-key"`
+            3. Rerun the app
+            """)
+    
+    # API Configuration
+    HIGHLIGHTLY_HOST = "sport-highlights-api.p.rapidapi.com"
+    HEADERS = {
+        "x-rapidapi-host": HIGHLIGHTLY_HOST,
+        "x-rapidapi-key": HIGHLIGHTLY_KEY
+    }
+    BASE_URL = f"https://{HIGHLIGHTLY_HOST}"
+    
+    def make_request(endpoint: str, params: dict = None):
+        """Make API request"""
+        if not HIGHLIGHTLY_KEY:
+            return None
+        
+        url = f"{BASE_URL}{endpoint}"
+        try:
+            response = requests.get(url, headers=HEADERS, params=params, timeout=15)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            st.error(f"API Error: {e}")
+            return None
+    
+    # Main UI
+    st.title("🏈 Highlightly Sports API Tester")
+    
+    # Test connection button
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔌 Test Connection"):
+            with st.spinner("Testing..."):
+                result = make_request("/football/countries", {"limit": 1})
+                if result:
+                    st.success("✅ API Connected Successfully!")
+                    st.json(result)
+                else:
+                    st.error("❌ Connection Failed")
+    
+    with col2:
+        if HIGHLIGHTLY_KEY:
+            st.info(f"API Key: {HIGHLIGHTLY_KEY[:10]}...")
+    
+    # Simple test section
+    st.header("Quick Test")
+    
+    test_option = st.selectbox(
+        "Select test:",
+        ["Countries", "Leagues", "Teams", "Matches"]
+    )
+    
+    if test_option == "Countries":
+        if st.button("Fetch Countries"):
+            with st.spinner("Fetching..."):
+                data = make_request("/football/countries")
+                if data and "data" in data:
+                    st.success(f"Found {len(data['data'])} countries")
+                    st.dataframe(pd.DataFrame(data["data"]))
+    
+    elif test_option == "Leagues":
+        league_name = st.text_input("League name (optional)")
+        if st.button("Fetch Leagues"):
+            with st.spinner("Fetching..."):
+                params = {"limit": 20}
+                if league_name:
+                    params["leagueName"] = league_name
+                data = make_request("/football/leagues", params)
+                if data and "data" in data:
+                    st.success(f"Found {len(data['data'])} leagues")
+                    for league in data["data"][:10]:
+                        st.write(f"- {league.get('name')} (ID: {league.get('id')})")
+    
+    elif test_option == "Teams":
+        team_name = st.text_input("Team name", placeholder="Vikingur")
+        if st.button("Search Teams") and team_name:
+            with st.spinner("Searching..."):
+                data = make_request("/football/teams", {"name": team_name, "limit": 20})
+                if data and "data" in data:
+                    st.success(f"Found {len(data['data'])} teams")
+                    for team in data["data"]:
+                        st.write(f"- {team.get('name')} (ID: {team.get('id')})")
+    
+    elif test_option == "Matches":
+        match_date = st.date_input("Date", datetime.now())
+        if st.button("Fetch Matches"):
+            with st.spinner("Fetching..."):
+                data = make_request("/football/matches", {"date": match_date.strftime("%Y-%m-%d"), "limit": 20})
+                if data and "data" in data:
+                    st.success(f"Found {len(data['data'])} matches")
+                    for match in data["data"][:10]:
+                        home = match.get("homeTeam", {}).get("name", "?")
+                        away = match.get("awayTeam", {}).get("name", "?")
+                        st.write(f"- {home} vs {away}")
+    
+    st.divider()
+    st.caption("Debug mode - If you see this, the app is running!")
+    
+except Exception as e:
+    # Display any error that occurs
+    st.error(f"❌ App Error: {str(e)}")
+    st.code(traceback.format_exc())
