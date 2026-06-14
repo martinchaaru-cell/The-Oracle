@@ -1,295 +1,491 @@
+"""
+Match Oracle - Streamlit Frontend
+Supports both direct Highlightly API and Backend API
+"""
+
 import streamlit as st
 import requests
+import pandas as pd
+from datetime import datetime, timedelta
+import plotly.express as px
+import json
 
-st.set_page_config(page_title="Highlightly Sports API Tester", page_icon="🏈", layout="wide")
+# ============================================
+# CONFIGURATION
+# ============================================
 
-# Get API key from secrets
+st.set_page_config(
+    page_title="Match Oracle - Football Intelligence",
+    page_icon="🔮",
+    layout="wide"
+)
+
+# Get API keys from secrets
 HIGHLIGHTLY_KEY = st.secrets.get("HIGHLIGHTLY_API_KEY", "")
+BACKEND_URL = st.secrets.get("BACKEND_URL", "https://oracle-backend-1-vryo.onrender.com")
 
-st.title("🏈 Highlightly Sports API Tester")
-
-if not HIGHLIGHTLY_KEY:
-    st.error("❌ HIGHLIGHTLY_API_KEY not found in secrets")
-    st.stop()
+# League configuration
+LEAGUES = [
+    {"key": "PREMIER_LEAGUE", "name": "Premier League", "id": 39, "country": "England"},
+    {"key": "LA_LIGA", "name": "La Liga", "id": 140, "country": "Spain"},
+    {"key": "BUNDESLIGA", "name": "Bundesliga", "id": 78, "country": "Germany"},
+    {"key": "SERIE_A", "name": "Serie A", "id": 135, "country": "Italy"},
+    {"key": "LIGUE_1", "name": "Ligue 1", "id": 61, "country": "France"},
+    {"key": "EREDIVISIE", "name": "Eredivisie", "id": 88, "country": "Netherlands"},
+    {"key": "PRIMEIRA_LIGA", "name": "Primeira Liga", "id": 94, "country": "Portugal"},
+    {"key": "BRAZIL_SERIE_A", "name": "Brasileirão", "id": 71, "country": "Brazil"},
+    {"key": "J1_LEAGUE", "name": "J1 League", "id": 292, "country": "Japan"},
+]
 
 # ============================================
-# CORRECT API CONFIGURATION
+# SESSION STATE INITIALIZATION
 # ============================================
 
-BASE_URL = "https://sports.highlightly.net"
-HEADERS = {"x-rapidapi-key": HIGHLIGHTLY_KEY}
+if "mode" not in st.session_state:
+    st.session_state.mode = "backend"  # "backend" or "highlightly"
+if "scan_results" not in st.session_state:
+    st.session_state.scan_results = None
+if "highlightly_matches" not in st.session_state:
+    st.session_state.highlightly_matches = None
+if "scan_running" not in st.session_state:
+    st.session_state.scan_running = False
+if "selected_league_ids" not in st.session_state:
+    st.session_state.selected_league_ids = []
 
-def make_request(endpoint: str, params: dict = None):
-    """Make request to Highlightly API"""
-    url = f"{BASE_URL}{endpoint}"
+# ============================================
+# HIGHLIGHTLY API FUNCTIONS
+# ============================================
+
+class HighlightlyClient:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "https://sports.highlightly.net"
+        self.headers = {"x-rapidapi-key": api_key}
+    
+    def get_matches(self, date=None, league_id=None, limit=100):
+        url = f"{self.base_url}/football/matches"
+        params = {"limit": limit}
+        if date:
+            params["date"] = date
+        if league_id:
+            params["leagueId"] = league_id
+        
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=15)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data", []) if isinstance(data, dict) else data
+        except Exception as e:
+            st.error(f"Highlightly API error: {e}")
+        return []
+    
+    def get_team_info(self, team_id):
+        url = f"{self.base_url}/football/teams/{team_id}"
+        try:
+            response = requests.get(url, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data[0] if isinstance(data, list) and data else None
+        except Exception as e:
+            st.error(f"Error fetching team info: {e}")
+        return None
+    
+    def get_head_to_head(self, team_id_1, team_id_2):
+        url = f"{self.base_url}/football/head-2-head"
+        params = {"teamIdOne": team_id_1, "teamIdTwo": team_id_2}
+        try:
+            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                return data if isinstance(data, list) else data.get("data", [])
+        except Exception as e:
+            st.error(f"Error fetching H2H: {e}")
+        return []
+
+
+# ============================================
+# BACKEND API FUNCTIONS
+# ============================================
+
+def backend_start_scan(leagues, date):
+    """Start scan on backend"""
     try:
-        response = requests.get(url, headers=HEADERS, params=params, timeout=10)
-        return response.status_code, response.json() if response.status_code == 200 else None
+        response = requests.post(
+            f"{BACKEND_URL}/api/scan",
+            json={
+                "leagues": leagues,
+                "target_date": date.strftime("%Y-%m-%d"),
+                "season": 2026
+            },
+            timeout=10
+        )
+        return response.status_code == 200 and response.json().get("status") == "started"
     except Exception as e:
-        return 500, str(e)
+        st.error(f"Backend connection error: {e}")
+        return False
 
-# Test the connection
-st.subheader("🔌 Testing API Connection")
+def backend_get_status():
+    """Get scan status from backend"""
+    try:
+        response = requests.get(f"{BACKEND_URL}/api/status", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+    except Exception as e:
+        pass
+    return None
 
-# Test the countries endpoint
-status, data = make_request("/football/countries", {"name": "France"})
+def backend_upload_matches(content):
+    """Upload custom matches to backend"""
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/api/upload",
+            json={"content": content, "league": "Custom"},
+            timeout=10
+        )
+        return response.status_code == 200 and response.json().get("status") == "started"
+    except Exception as e:
+        st.error(f"Upload error: {e}")
+        return False
 
-if status == 200:
-    st.success("✅ API Connection Successful!")
-    
-    # Handle different response formats
-    if isinstance(data, list):
-        # Response is a list
-        st.write(f"Found {len(data)} countries")
-        for country in data:
-            if country.get("name") == "France":
-                st.write(f"Found: {country.get('name')} ({country.get('code')})")
-                if country.get("logo"):
-                    st.image(country["logo"], width=50)
-    elif isinstance(data, dict):
-        # Response is a single object
-        st.write(f"Found: {data.get('name', 'Unknown')} ({data.get('code', 'N/A')})")
-        if data.get("logo"):
-            st.image(data["logo"], width=50)
-    else:
-        st.write(f"Response type: {type(data)}")
-        st.json(data)
-else:
-    st.error(f"❌ API Connection Failed (Status: {status})")
-    st.stop()
 
 # ============================================
-# Main App
+# UI COMPONENTS
 # ============================================
 
-st.header("📊 Available Endpoints")
+# Header
+st.title("🔮 Match Oracle - Football Intelligence")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🌍 Countries", "⚽ Leagues", "🏟️ Teams", "📅 Matches"])
+# Mode selector
+col_mode1, col_mode2, col_mode3 = st.columns([1, 2, 1])
+with col_mode1:
+    mode = st.radio(
+        "API Mode",
+        ["Backend (Full Pipeline)", "Highlightly (Raw Data)"],
+        horizontal=True,
+        index=0 if st.session_state.mode == "backend" else 1
+    )
+    st.session_state.mode = "backend" if "Backend" in mode else "highlightly"
 
-# Tab 1: Countries
-with tab1:
-    country_search = st.text_input("Search country by name", placeholder="e.g., France, England")
+# Sidebar
+with st.sidebar:
+    st.header("⚙️ Settings")
     
-    if st.button("Search Countries"):
-        params = {}
-        if country_search:
-            params["name"] = country_search
-        
-        with st.spinner("Searching..."):
-            status, data = make_request("/football/countries", params)
-            
-            if status == 200:
-                if isinstance(data, list):
-                    st.success(f"Found {len(data)} countries")
-                    for country in data:
-                        st.write(f"- {country.get('name')} ({country.get('code')})")
-                elif isinstance(data, dict):
-                    st.success(f"Found: {data.get('name')}")
-                    st.json(data)
+    if st.session_state.mode == "backend":
+        st.info(f"🔗 Backend: {BACKEND_URL}")
+        backend_status = backend_get_status()
+        if backend_status:
+            st.success(f"✅ Backend Online")
+        else:
+            st.warning("⚠️ Backend may be starting up...")
+    
+    st.subheader("📅 Match Date")
+    match_date = st.date_input("Date", datetime.now())
+    
+    st.subheader("🏆 Select Leagues")
+    selected_leagues = []
+    for league in LEAGUES:
+        if st.checkbox(league["name"], key=f"league_{league['key']}"):
+            selected_leagues.append(league["key"])
+            if league["id"] not in st.session_state.selected_league_ids:
+                st.session_state.selected_league_ids.append(league["id"])
+    
+    st.session_state.selected_league_ids = [
+        l["id"] for l in LEAGUES if l["key"] in selected_leagues
+    ]
+    
+    # Run button
+    if selected_leagues:
+        if st.button("🚀 Run Scan", type="primary", use_container_width=True):
+            if st.session_state.mode == "backend":
+                if backend_start_scan(selected_leagues, match_date):
+                    st.session_state.scan_running = True
+                    st.session_state.scan_results = None
+                    st.success("Scan started!")
+                    st.rerun()
                 else:
-                    st.write("Response:", data)
+                    st.error("Failed to start scan")
             else:
-                st.error(f"Failed: Status {status}")
-
-# Tab 2: Leagues
-with tab2:
-    league_search = st.text_input("Search league", placeholder="e.g., Premier League")
-    country_code = st.text_input("Filter by country code (optional)", placeholder="GB, FR, DE")
+                st.session_state.scan_running = True
+                st.rerun()
     
-    if st.button("Search Leagues"):
-        params = {"limit": 50}
-        if league_search:
-            params["leagueName"] = league_search
-        if country_code:
-            params["countryCode"] = country_code
-        
-        with st.spinner("Searching..."):
-            status, data = make_request("/football/leagues", params)
-            
-            if status == 200:
-                # Handle different response structures
-                leagues = []
-                if isinstance(data, dict) and "data" in data:
-                    leagues = data["data"]
-                elif isinstance(data, list):
-                    leagues = data
-                else:
-                    st.write("Unexpected response format:", type(data))
-                    st.json(data)
-                    leagues = []
-                
-                if leagues:
-                    st.success(f"Found {len(leagues)} leagues")
-                    for league in leagues[:20]:
-                        with st.expander(f"🏆 {league.get('name', 'Unknown')}"):
-                            st.write(f"**ID:** {league.get('id')}")
-                            st.write(f"**Country:** {league.get('country', {}).get('name', 'Unknown')}")
-                            seasons = [s.get("season") for s in league.get("seasons", [])]
-                            if seasons:
-                                st.write(f"**Seasons:** {', '.join(map(str, seasons[-5:]))}")
-                else:
-                    st.info("No leagues found")
+    # Upload section
+    st.divider()
+    st.subheader("📤 Upload Matches")
+    upload_text = st.text_area(
+        "CSV Format: Home,Away,Selection,HomeOdds,DrawOdds,AwayOdds,League",
+        height=120,
+        placeholder="Manchester City,Arsenal,Man City,1.85,3.40,4.20,Premier League"
+    )
+    
+    if st.button("🔍 Scan Upload", use_container_width=True):
+        if upload_text.strip():
+            if st.session_state.mode == "backend":
+                if backend_upload_matches(upload_text):
+                    st.session_state.scan_running = True
+                    st.success("Upload scan started!")
+                    st.rerun()
             else:
-                st.error(f"Failed to fetch leagues (Status: {status})")
+                st.info("Upload scanning is only available in Backend mode")
+    
+    # API Status
+    st.divider()
+    if st.session_state.mode == "highlightly":
+        if HIGHLIGHTLY_KEY:
+            st.success("✅ Highlightly API Key loaded")
+        else:
+            st.error("❌ Highlightly API Key missing")
 
-# Tab 3: Teams
-with tab3:
-    team_search = st.text_input("Search team", placeholder="e.g., Vikingur Gota, Manchester United")
-    
-    if st.button("Search Teams"):
-        params = {"limit": 50}
-        if team_search:
-            params["name"] = team_search
-        
-        with st.spinner("Searching..."):
-            status, data = make_request("/football/teams", params)
-            
-            if status == 200:
-                # Handle different response structures
-                teams = []
-                if isinstance(data, dict) and "data" in data:
-                    teams = data["data"]
-                elif isinstance(data, list):
-                    teams = data
-                else:
-                    st.write("Unexpected response format:", type(data))
-                    st.json(data)
-                    teams = []
-                
-                if teams:
-                    st.success(f"Found {len(teams)} teams")
-                    for team in teams:
-                        col1, col2 = st.columns([1, 4])
-                        with col1:
-                            if team.get("logo"):
-                                st.image(team["logo"], width=40)
-                            else:
-                                st.write("🏟️")
-                        with col2:
-                            st.markdown(f"**{team.get('name', 'Unknown')}**")
-                            st.caption(f"ID: `{team.get('id')}` | Type: {team.get('type', 'club')}")
-                        st.divider()
-                else:
-                    st.info(f"No teams found for '{team_search}'")
-            else:
-                st.error(f"Failed to fetch teams (Status: {status})")
 
-# Tab 4: Matches
-with tab4:
-    from datetime import datetime, timedelta
+# ============================================
+# MAIN CONTENT - HIGHLIGHTLY MODE
+# ============================================
+
+if st.session_state.mode == "highlightly":
+    st.subheader("🏟️ Raw Match Data from Highlightly API")
     
-    date_option = st.radio("Date", ["Today", "Tomorrow", "Pick date"], horizontal=True)
-    
-    if date_option == "Today":
-        match_date = datetime.now().strftime("%Y-%m-%d")
-    elif date_option == "Tomorrow":
-        match_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-    else:
-        match_date = st.date_input("Select date", datetime.now()).strftime("%Y-%m-%d")
-    
-    if st.button("Fetch Matches"):
-        params = {"date": match_date, "limit": 100}
-        
-        with st.spinner(f"Fetching matches for {match_date}..."):
-            status, data = make_request("/football/matches", params)
+    if st.session_state.scan_running and not st.session_state.highlightly_matches:
+        with st.spinner("Fetching matches from Highlightly..."):
+            client = HighlightlyClient(HIGHLIGHTLY_KEY)
+            all_matches = []
             
-            if status == 200:
-                # Handle different response structures
-                matches = []
-                if isinstance(data, dict) and "data" in data:
-                    matches = data["data"]
-                elif isinstance(data, list):
-                    matches = data
-                else:
-                    st.write("Unexpected response format:", type(data))
-                    matches = []
+            progress_bar = st.progress(0)
+            for i, league_id in enumerate(st.session_state.selected_league_ids):
+                matches = client.get_matches(
+                    date=match_date.strftime("%Y-%m-%d"),
+                    league_id=league_id,
+                    limit=50
+                )
+                all_matches.extend(matches)
+                progress_bar.progress((i + 1) / max(len(st.session_state.selected_league_ids), 1))
+            
+            st.session_state.highlightly_matches = all_matches
+            st.session_state.scan_running = False
+    
+    # Display matches
+    if st.session_state.highlightly_matches:
+        matches = st.session_state.highlightly_matches
+        st.success(f"✅ Found {len(matches)} matches on {match_date}")
+        
+        # Search filter
+        search = st.text_input("🔍 Filter matches", placeholder="Team name...")
+        
+        filtered = matches
+        if search:
+            filtered = [m for m in matches if 
+                       search.lower() in m.get("homeTeam", {}).get("name", "").lower() or
+                       search.lower() in m.get("awayTeam", {}).get("name", "").lower()]
+        
+        for match in filtered[:30]:
+            home = match.get("homeTeam", {}).get("name", "?")
+            away = match.get("awayTeam", {}).get("name", "?")
+            league = match.get("league", {}).get("name", "?")
+            state = match.get("state", {}).get("description", "Unknown")
+            score = match.get("state", {}).get("score", {}).get("current", "vs")
+            
+            with st.container():
+                col1, col2, col3, col4, col5 = st.columns([3, 1, 3, 2, 1])
+                with col1:
+                    st.markdown(f"**{home}**")
+                with col2:
+                    st.markdown(f"`{score}`")
+                with col3:
+                    st.markdown(f"**{away}**")
+                with col4:
+                    st.caption(f"{league}")
+                with col5:
+                    status_color = "🟢" if state == "Not started" else "🟡" if state == "In progress" else "⚫"
+                    st.caption(f"{status_color} {state}")
                 
-                if matches:
-                    st.success(f"✅ Found {len(matches)} matches on {match_date}")
+                # Expandable details
+                with st.expander("📊 Match Details"):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.markdown("**Home Team Info**")
+                        home_id = match.get("homeTeam", {}).get("id")
+                        if home_id:
+                            team_info = client.get_team_info(home_id)
+                            if team_info:
+                                st.write(f"Name: {team_info.get('name')}")
+                                st.write(f"ID: {team_info.get('id')}")
                     
-                    for match in matches[:20]:
-                        home = match.get("homeTeam", {}).get("name", "?")
-                        away = match.get("awayTeam", {}).get("name", "?")
-                        league = match.get("league", {}).get("name", "?")
-                        state = match.get("state", {}).get("description", "Unknown")
-                        score = match.get("state", {}).get("score", {}).get("current", "vs")
-                        
-                        col1, col2, col3, col4 = st.columns([3, 1, 3, 2])
-                        with col1:
-                            st.write(home)
-                        with col2:
-                            st.write(score)
-                        with col3:
-                            st.write(away)
-                        with col4:
-                            st.caption(f"{league[:20]} | {state}")
-                        st.divider()
-                else:
-                    st.info(f"No matches found for {match_date}")
-            else:
-                st.info(f"Failed to fetch matches (Status: {status})")
-
-# Tab 5: Head-to-Head (Bonus)
-st.subheader("🎯 Head-to-Head Search")
-
-col1, col2 = st.columns(2)
-with col1:
-    team1 = st.text_input("Team 1", placeholder="Vikingur Gota")
-with col2:
-    team2 = st.text_input("Team 2", placeholder="07 Vestur")
-
-if st.button("Get H2H Data") and team1 and team2:
-    # First find team IDs
-    with st.spinner("Finding teams..."):
-        status, teams_data = make_request("/football/teams", {"name": team1, "limit": 5})
+                    with col_b:
+                        st.markdown("**Away Team Info**")
+                        away_id = match.get("awayTeam", {}).get("id")
+                        if away_id:
+                            team_info = client.get_team_info(away_id)
+                            if team_info:
+                                st.write(f"Name: {team_info.get('name')}")
+                                st.write(f"ID: {team_info.get('id')}")
+                    
+                    # Show CSV format for easy upload to backend
+                    st.markdown("**📋 Copy to Backend (CSV format):**")
+                    csv_line = f"{home},{away},{home},2.00,3.25,3.50,{league}"
+                    st.code(csv_line, language="csv")
+                
+                st.divider()
         
-        if status == 200:
-            teams = teams_data.get("data", []) if isinstance(teams_data, dict) else teams_data
-            if teams:
-                team1_id = teams[0]["id"]
-                team1_name = teams[0]["name"]
-                st.success(f"Found Team 1: {team1_name} (ID: {team1_id})")
-            else:
-                st.error(f"Team '{team1}' not found")
-                st.stop()
-        else:
-            st.error(f"Failed to find team '{team1}'")
-            st.stop()
-    
-    with st.spinner("Finding second team..."):
-        status, teams_data = make_request("/football/teams", {"name": team2, "limit": 5})
+        if len(matches) > 30:
+            st.info(f"Showing 30 of {len(matches)} matches")
         
-        if status == 200:
-            teams = teams_data.get("data", []) if isinstance(teams_data, dict) else teams_data
-            if teams:
-                team2_id = teams[0]["id"]
-                team2_name = teams[0]["name"]
-                st.success(f"Found Team 2: {team2_name} (ID: {team2_id})")
-            else:
-                st.error(f"Team '{team2}' not found")
-                st.stop()
-        else:
-            st.error(f"Failed to find team '{team2}'")
-            st.stop()
-    
-    # Get H2H data
-    with st.spinner("Fetching head-to-head data..."):
-        params = {"teamIdOne": team1_id, "teamIdTwo": team2_id}
-        status, h2h_data = make_request("/football/head-2-head", params)
+        # Action buttons
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("🔄 Refresh"):
+                st.session_state.highlightly_matches = None
+                st.session_state.scan_running = True
+                st.rerun()
         
-        if status == 200:
-            matches = h2h_data if isinstance(h2h_data, list) else h2h_data.get("data", [])
-            st.success(f"Found {len(matches)} historical matches")
+        with col_b:
+            csv_export = "\n".join([
+                f"{m.get('homeTeam', {}).get('name', '')},{m.get('awayTeam', {}).get('name', '')},{m.get('homeTeam', {}).get('name', '')},2.00,3.25,3.50,{m.get('league', {}).get('name', '')}"
+                for m in matches[:50]
+            ])
+            st.download_button(
+                "📥 Export to CSV",
+                csv_export,
+                file_name=f"matches_{match_date}.csv",
+                mime="text/csv"
+            )
+
+
+# ============================================
+# MAIN CONTENT - BACKEND MODE
+# ============================================
+
+else:
+    # Poll for results in backend mode
+    if st.session_state.scan_running:
+        status = backend_get_status()
+        
+        if status:
+            # Show log
+            if status.get("log"):
+                with st.expander("📋 Scan Log"):
+                    for log_entry in status["log"][-20:]:
+                        st.code(log_entry, language="text")
             
-            for match in matches[:10]:
-                date = match.get("date", "Unknown")[:10]
-                home = match.get("homeTeam", {}).get("name", "?")
-                away = match.get("awayTeam", {}).get("name", "?")
-                score = match.get("state", {}).get("score", {}).get("current", "0-0")
-                st.write(f"📅 {date}: {home} {score} {away}")
+            # Check if complete
+            if not status.get("running", True):
+                st.session_state.scan_running = False
+                st.session_state.scan_results = status.get("results", {})
+                st.success("✅ Scan complete!")
+                st.rerun()
+            else:
+                st.info("⏳ Scan in progress...")
+                st.caption("Refreshing in 3 seconds...")
+                import time
+                time.sleep(3)
+                st.rerun()
+    
+    # Display backend results
+    if st.session_state.scan_results:
+        results = st.session_state.scan_results
+        totals = results.get("totals", {})
+        
+        # Summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("📊 Scanned", totals.get("total", 0))
+        with col2:
+            st.metric("✅ Approved", totals.get("approved", 0), delta=None, delta_color="normal")
+        with col3:
+            st.metric("⚠️ Caution", totals.get("caution", 0))
+        with col4:
+            st.metric("❌ Rejected", totals.get("rejected", 0))
+        
+        st.divider()
+        
+        # Display matches by league
+        leagues_data = results.get("leagues", [])
+        
+        if leagues_data:
+            league_tabs = st.tabs([l.get("league", "Unknown") for l in leagues_data])
+            
+            for tab, league_data in zip(league_tabs, leagues_data):
+                with tab:
+                    matches = league_data.get("matches", [])
+                    st.write(f"**{len(matches)} matches**")
+                    
+                    for match in matches:
+                        home = match.get("match", "").split(" vs ")[0] if " vs " in match.get("match", "") else "?"
+                        away = match.get("match", "").split(" vs ")[1] if " vs " in match.get("match", "") else "?"
+                        status = match.get("final_status", "PENDING")
+                        
+                        # Status color
+                        if status == "APPROVED":
+                            status_badge = "🟢 APPROVED"
+                        elif status == "CAUTION":
+                            status_badge = "🟡 CAUTION"
+                        elif status == "REJECTED":
+                            status_badge = "🔴 REJECTED"
+                        else:
+                            status_badge = "⚪ PENDING"
+                        
+                        with st.expander(f"{home} vs {away} - {status_badge}"):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown("**📊 Match Info**")
+                                st.write(f"Date: {match.get('match_date', 'N/A')}")
+                                st.write(f"Kickoff: {match.get('kickoff_time', 'N/A')}")
+                                st.write(f"Selection: {match.get('selection', 'N/A')} @ {match.get('odds', 'N/A')}")
+                                
+                                st.markdown("**🎲 Odds**")
+                                st.write(f"Home: {match.get('home_odds', '-')}")
+                                st.write(f"Draw: {match.get('draw_odds', '-')}")
+                                st.write(f"Away: {match.get('away_odds', '-')}")
+                            
+                            with col2:
+                                st.markdown("**🔮 Oracle Verdict**")
+                                oracle = match.get("oracle", {})
+                                st.write(f"Model Prob: {oracle.get('model_prob', 0)*100:.1f}%")
+                                st.write(f"Edge: {oracle.get('edge', 0)*100:.1f}%")
+                                st.write(f"Failure Score: {oracle.get('failure_score', 0)}")
+                                st.write(f"Pre-filter: {'✅ PASS' if oracle.get('pre_filter_passed') else '❌ FAIL'}")
+                            
+                            # Forensic report tabs
+                            tab1, tab2, tab3, tab4 = st.tabs(["🏆 M4 Pre-filter", "🔄 M8 Dual Pattern", "⚠️ M9 Underdog", "📝 Decision Notes"])
+                            
+                            with tab1:
+                                m4 = match.get("m4_prefilter", {})
+                                st.write(f"Passed: {m4.get('passed', False)}")
+                                st.write(f"Checks Passed: {m4.get('checks_passed', 0)}/8")
+                                for detail in m4.get("details", []):
+                                    result = "✅" if detail.get("result") == "PASS" else "❌" if detail.get("result") == "FAIL" else "⚠️"
+                                    st.write(f"{result} {detail.get('check')}: {detail.get('detail', '')[:80]}")
+                            
+                            with tab2:
+                                m8 = match.get("m8_dual", {})
+                                st.write(f"Dual Risk Level: {m8.get('dual_risk_level', 'UNKNOWN')}")
+                                st.write(f"Clean Risk Score: {m8.get('clean_risk_score', '-')}")
+                                st.write(f"Conflict Detected: {'⚠️ YES' if m8.get('conflict_detected') else '✅ NO'}")
+                                st.write(f"Underdog Threat: {m8.get('underdog_threat', 'NONE')}")
+                            
+                            with tab3:
+                                m9 = match.get("m9_underdog", {})
+                                st.write(f"Threat Level: {m9.get('threat_level', 'NONE')}")
+                                st.write(f"Recommendation: {m9.get('recommendation', 'NONE')}")
+                                st.write(f"Underdog Edge: {m9.get('underdog_edge', 0)}")
+                            
+                            with tab4:
+                                for note in match.get("decision_notes", []):
+                                    st.caption(f"• {note}")
+                                
+                                risk_flags = match.get("risk_flags", [])
+                                if risk_flags:
+                                    st.markdown("**⚠️ Risk Flags**")
+                                    for flag in risk_flags:
+                                        st.error(flag)
         else:
-            st.error(f"Failed to fetch H2H data (Status: {status})")
+            st.info("No results yet. Select leagues and click 'Run Scan'")
+    
+    else:
+        st.info("👈 Select leagues from the sidebar and click 'Run Scan' to get started")
 
-# Footer
+
+# ============================================
+# FOOTER
+# ============================================
+
 st.divider()
-st.caption(f"API Base URL: {BASE_URL} | Free Tier: 100 requests/day")
+st.caption(f"🔮 Match Oracle | Mode: {st.session_state.mode.upper()} | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
