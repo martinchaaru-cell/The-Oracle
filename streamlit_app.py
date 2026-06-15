@@ -1,4 +1,4 @@
-# streamlit_app.py - DEBUGGABLE VERSION
+# streamlit_app.py - DISPLAYS ALL LEG DATA (EXCLUDING ODDS)
 import streamlit as st
 import requests
 from datetime import datetime
@@ -10,77 +10,150 @@ if "all_matches" not in st.session_state:
     st.session_state.all_matches = None
 if "selected_leg_data" not in st.session_state:
     st.session_state.selected_leg_data = None
-if "api_debug" not in st.session_state:
-    st.session_state.api_debug = {}
+if "selected_leg_name" not in st.session_state:
+    st.session_state.selected_leg_name = ""
 
 API_KEY = st.secrets.get("HIGHLIGHTLY_API_KEY", "")
 API_HOST = "sports.highlightly.net"
 
 st.title("⚽ MATCH ORACLE - LIVE MATCHES")
 
-def debug_api_call(url, headers, params=None):
-    """Make API call and return full debug info"""
-    result = {
-        "url": url,
-        "headers": headers,
-        "params": params,
-        "status_code": None,
-        "response_text": None,
-        "response_json": None,
-        "error": None
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=15)
-        result["status_code"] = response.status_code
-        result["response_text"] = response.text[:1000]
-        
-        if response.status_code == 200:
-            try:
-                result["response_json"] = response.json()
-            except:
-                result["error"] = "Could not parse JSON"
-        else:
-            result["error"] = f"HTTP {response.status_code}"
-    except Exception as e:
-        result["error"] = str(e)
-    
-    return result
-
-def fetch_matches_with_debug(date_str):
-    """Fetch matches with full debug output"""
-    url = "https://sports.highlightly.net/football/matches"
-    headers = {
-        "x-rapidapi-key": API_KEY,
-        "x-rapidapi-host": API_HOST
-    }
-    params = {"date": date_str}
-    
-    result = debug_api_call(url, headers, params)
-    st.session_state.api_debug["matches_list"] = result
-    
-    if result["status_code"] == 200 and result["response_json"]:
-        data = result["response_json"]
-        if isinstance(data, dict):
-            if "response" in data:
-                return data["response"]
-            elif "data" in data:
-                return data["data"]
-        elif isinstance(data, list):
-            return data
-    return []
-
-def fetch_match_leg_with_debug(match_id):
-    """Fetch individual match leg data with full debug output"""
+def fetch_match_leg_data(match_id):
+    """Fetch complete leg data (excluding odds on free tier)"""
     url = f"https://sports.highlightly.net/football/matches/{match_id}"
     headers = {
         "x-rapidapi-key": API_KEY,
         "x-rapidapi-host": API_HOST
     }
     
-    result = debug_api_call(url, headers)
-    st.session_state.api_debug["match_leg"] = result
-    return result["response_json"] if result["status_code"] == 200 else None
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+    except Exception as e:
+        return None
+
+def fetch_matches_by_date(date_str):
+    """Fetch matches for a specific date"""
+    url = f"https://sports.highlightly.net/football/matches"
+    headers = {
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": API_HOST
+    }
+    params = {"date": date_str}
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, dict):
+                if "response" in data:
+                    return data["response"]
+                elif "data" in data:
+                    return data["data"]
+            elif isinstance(data, list):
+                return data
+        return []
+    except Exception as e:
+        return []
+
+def display_leg_data(leg_data, match_name):
+    """Display all leg data excluding odds (since free tier has no odds)"""
+    st.subheader(f"📊 MATCH LEG DATA: {match_name}")
+    
+    # Handle different response structures
+    if isinstance(leg_data, dict):
+        # If the response has a 'response' wrapper
+        if "response" in leg_data:
+            leg_data = leg_data["response"]
+        
+        # Display basic match info
+        st.markdown("### 🏟️ MATCH INFORMATION")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**HOME TEAM**")
+            home_team = leg_data.get("homeTeam", {})
+            st.write(f"Name: {home_team.get('name', 'N/A')}")
+            st.write(f"ID: {home_team.get('id', 'N/A')}")
+            if home_team.get('logo'):
+                st.image(home_team.get('logo'), width=50)
+        
+        with col2:
+            st.markdown("**AWAY TEAM**")
+            away_team = leg_data.get("awayTeam", {})
+            st.write(f"Name: {away_team.get('name', 'N/A')}")
+            st.write(f"ID: {away_team.get('id', 'N/A')}")
+            if away_team.get('logo'):
+                st.image(away_team.get('logo'), width=50)
+        
+        # League information
+        st.markdown("### 🏆 COMPETITION")
+        league = leg_data.get("league", {})
+        st.write(f"Name: {league.get('name', 'N/A')}")
+        st.write(f"Country: {league.get('country', 'N/A')}")
+        st.write(f"Season: {leg_data.get('season', {}).get('name', 'N/A')}")
+        st.write(f"Round: {leg_data.get('round', {}).get('name', 'N/A')}")
+        
+        # Match status
+        st.markdown("### 📅 MATCH STATUS")
+        status = leg_data.get("status", {})
+        st.write(f"Status: {status.get('long', 'N/A')}")
+        st.write(f"Short: {status.get('short', 'N/A')}")
+        if status.get('elapsed'):
+            st.write(f"Elapsed: {status.get('elapsed')} minutes")
+        
+        # Score if available
+        if leg_data.get("scores"):
+            st.markdown("### ⚽ SCORES")
+            scores = leg_data["scores"]
+            st.write(f"Home: {scores.get('home', 0)} - Away: {scores.get('away', 0)}")
+            if scores.get('halftime'):
+                st.write(f"Half-time: {scores['halftime'].get('home', 0)} - {scores['halftime'].get('away', 0)}")
+            if scores.get('fulltime'):
+                st.write(f"Full-time: {scores['fulltime'].get('home', 0)} - {scores['fulltime'].get('away', 0)}")
+        
+        # Venue information
+        if leg_data.get("venue"):
+            st.markdown("### 🏟️ VENUE")
+            venue = leg_data["venue"]
+            st.write(f"Name: {venue.get('name', 'N/A')}")
+            st.write(f"City: {venue.get('city', 'N/A')}")
+            if venue.get('capacity'):
+                st.write(f"Capacity: {venue.get('capacity')}")
+        
+        # Head to Head if available
+        if leg_data.get("head_to_head"):
+            st.markdown("### 📊 HEAD TO HEAD")
+            h2h = leg_data["head_to_head"]
+            st.write(f"Total matches: {h2h.get('total', 'N/A')}")
+            if h2h.get('home_wins') is not None:
+                st.write(f"Home wins: {h2h.get('home_wins')}")
+                st.write(f"Draws: {h2h.get('draws')}")
+                st.write(f"Away wins: {h2h.get('away_wins')}")
+        
+        # Recent form
+        if leg_data.get("form"):
+            st.markdown("### 📈 RECENT FORM")
+            form = leg_data["form"]
+            if form.get('home'):
+                st.write(f"Home team form: {form.get('home')}")
+            if form.get('away'):
+                st.write(f"Away team form: {form.get('away')}")
+        
+        # Note about odds
+        st.info("ℹ️ Odds data is not available in the free tier. Upgrade to access odds from 100+ bookmakers.")
+        
+        # Raw data expander
+        with st.expander("📄 View Raw API Response"):
+            st.json(leg_data)
+    
+    else:
+        st.warning("No leg data available")
+        st.json(leg_data)
 
 # Sidebar
 with st.sidebar:
@@ -89,15 +162,12 @@ with st.sidebar:
     date = st.date_input("Match Date", datetime.now())
     date_str = date.strftime("%Y-%m-%d")
     
-    league_filter = st.text_input("League contains", placeholder="Premier, Serie")
-    
-    # Debug toggle
-    show_debug = st.checkbox("🔍 Show API Debug Info", value=True)
+    league_filter = st.text_input("League contains", placeholder="Premier, Serie, La Liga")
     
     if st.button("🚀 FETCH MATCHES", type="primary", use_container_width=True):
         with st.spinner("Fetching matches..."):
-            matches = fetch_matches_with_debug(date_str)
-            if matches:
+            matches = fetch_matches_by_date(date_str)
+            if matches and len(matches) > 0:
                 st.session_state.all_matches = matches
                 st.success(f"✅ Loaded {len(matches)} matches!")
             else:
@@ -106,15 +176,21 @@ with st.sidebar:
             st.rerun()
     
     if st.session_state.all_matches:
-        st.info(f"📊 {len(st.session_state.all_matches)} matches")
+        st.info(f"📊 {len(st.session_state.all_matches)} matches loaded")
+        st.caption("Click 'VIEW LEG DATA' on any match to see full details")
 
 # Main content
 if st.session_state.all_matches:
     matches = st.session_state.all_matches
     
-    # Apply filter
+    # Apply league filter
     if league_filter:
-        matches = [m for m in matches if league_filter.lower() in str(m.get("league", {}).get("name", "")).lower()]
+        filtered_matches = []
+        for match in matches:
+            league_name = match.get("league", {}).get("name", "")
+            if league_filter.lower() in league_name.lower():
+                filtered_matches.append(match)
+        matches = filtered_matches
     
     st.subheader(f"📋 MATCHES ({len(matches)})")
     
@@ -124,108 +200,63 @@ if st.session_state.all_matches:
         league = match.get("league", {}).get("name", "Unknown")
         match_id = match.get("id")
         
+        # Determine if odds might be available (free tier doesn't have them)
+        odds_status = "⚠️ No odds (free tier)"
+        
         with st.expander(f"{idx+1}. {home} vs {away} - {league}"):
-            st.write(f"**Match ID:** {match_id}")
-            st.write(f"**Status:** {match.get('status', {}).get('long', 'Scheduled')}")
+            col1, col2 = st.columns([3, 1])
             
-            # The button - each match has its own unique key
-            button_key = f"leg_btn_{match_id}_{idx}"
+            with col1:
+                st.write(f"**Match ID:** {match_id}")
+                st.write(f"**Status:** {match.get('status', {}).get('long', 'Scheduled')}")
+                st.caption(odds_status)
             
-            if st.button("📊 FETCH THIS MATCH'S LEG DATA", key=button_key, use_container_width=True):
-                st.write("🔄 Fetching leg data from API...")
-                
-                # Fetch the leg data
-                leg_data = fetch_match_leg_with_debug(match_id)
-                
-                if leg_data:
-                    st.session_state.selected_leg_data = leg_data
-                    st.session_state.selected_leg_name = f"{home} vs {away}"
-                    st.success(f"✅ Successfully fetched leg data for {home} vs {away}!")
-                else:
-                    st.error(f"❌ Failed to fetch leg data for match {match_id}")
-                    st.session_state.selected_leg_data = None
-                
-                st.rerun()
+            with col2:
+                # Button to fetch and display leg data
+                button_key = f"leg_btn_{match_id}_{idx}"
+                if st.button("📊 VIEW LEG DATA", key=button_key, use_container_width=True):
+                    with st.spinner(f"Fetching leg data for {home} vs {away}..."):
+                        leg_data = fetch_match_leg_data(match_id)
+                        if leg_data:
+                            st.session_state.selected_leg_data = leg_data
+                            st.session_state.selected_leg_name = f"{home} vs {away}"
+                            st.success(f"✅ Leg data loaded!")
+                        else:
+                            st.error(f"❌ Failed to load leg data")
+                        st.rerun()
     
     # Display selected leg data
     if st.session_state.selected_leg_data:
         st.divider()
-        st.subheader(f"📊 LEG DATA: {st.session_state.selected_leg_name}")
+        display_leg_data(st.session_state.selected_leg_data, st.session_state.selected_leg_name)
         
-        leg_data = st.session_state.selected_leg_data
-        
-        # Try to extract odds from the leg data
-        st.write("**Attempting to extract odds from leg data...**")
-        
-        # Search for odds in the response
-        odds_found = []
-        
-        def search_for_odds(obj, path=""):
-            if isinstance(obj, dict):
-                for key, value in obj.items():
-                    if "odd" in key.lower() or "price" in key.lower():
-                        odds_found.append({"path": f"{path}.{key}", "value": value})
-                    elif key == "outcomes" and isinstance(value, list):
-                        for outcome in value:
-                            if isinstance(outcome, dict):
-                                name = outcome.get("name", "")
-                                price = outcome.get("price", 0)
-                                if price:
-                                    odds_found.append({"type": "outcome", "name": name, "price": price})
-                    else:
-                        search_for_odds(value, f"{path}.{key}")
-            elif isinstance(obj, list):
-                for i, item in enumerate(obj):
-                    search_for_odds(item, f"{path}[{i}]")
-        
-        search_for_odds(leg_data)
-        
-        if odds_found:
-            st.success(f"✅ Found {len(odds_found)} odds in the API response!")
-            st.write("**Extracted odds:**")
-            for odd in odds_found:
-                st.code(str(odd))
-        else:
-            st.warning("⚠️ No odds found in the API response")
-            st.write("The API returned data but it doesn't contain odds. Here's what was returned:")
-        
-        # Show the raw response
-        with st.expander("📄 RAW API RESPONSE (Full Leg Data)", expanded=True):
-            st.json(leg_data)
-        
-        if st.button("❌ Clear Leg Data"):
-            st.session_state.selected_leg_data = None
-            st.rerun()
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            if st.button("❌ Close", use_container_width=True):
+                st.session_state.selected_leg_data = None
+                st.session_state.selected_leg_name = ""
+                st.rerun()
 
 else:
     st.info("👈 Click 'FETCH MATCHES' to load matches")
-
-# Show API debug info
-if show_debug and st.session_state.get("api_debug"):
-    st.divider()
-    st.subheader("🔍 API DEBUG INFO")
     
-    if "matches_list" in st.session_state.api_debug:
-        with st.expander("Matches List API Call", expanded=True):
-            debug = st.session_state.api_debug["matches_list"]
-            st.write(f"**URL:** {debug['url']}")
-            st.write(f"**Status Code:** {debug['status_code']}")
-            if debug.get("error"):
-                st.error(f"Error: {debug['error']}")
-            if debug.get("response_text"):
-                st.write("**Response Preview:**")
-                st.code(debug["response_text"][:500])
-    
-    if "match_leg" in st.session_state.api_debug:
-        with st.expander("Match Leg API Call (Last Attempt)", expanded=True):
-            debug = st.session_state.api_debug["match_leg"]
-            st.write(f"**URL:** {debug['url']}")
-            st.write(f"**Status Code:** {debug['status_code']}")
-            if debug.get("error"):
-                st.error(f"Error: {debug['error']}")
-            if debug.get("response_text"):
-                st.write("**Response Preview:**")
-                st.code(debug["response_text"][:500])
+    with st.expander("ℹ️ About Leg Data"):
+        st.markdown("""
+        **What data is available in the free tier:**
+        - ✅ Team names and IDs
+        - ✅ League and competition info
+        - ✅ Match status (scheduled, live, finished)
+        - ✅ Scores (when available)
+        - ✅ Venue information
+        - ✅ Head-to-head stats
+        - ✅ Recent form
+        - ❌ Odds (requires paid tier)
+        
+        **To see leg data:**
+        1. Click "FETCH MATCHES" to load matches
+        2. Click "VIEW LEG DATA" on any match
+        3. All available data will be displayed below
+        """)
 
 st.divider()
-st.caption(f"Match Oracle Debug Mode | {datetime.now()}")
+st.caption(f"Match Oracle | Free Tier (No Odds) | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
