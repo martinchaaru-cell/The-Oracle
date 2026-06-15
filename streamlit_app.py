@@ -1,4 +1,4 @@
-# streamlit_app.py - PROPER ODDS EXTRACTION
+# streamlit_app.py - PROPER ODDS EXTRACTION WITH CORRECTED API
 import streamlit as st
 import requests
 from datetime import datetime
@@ -60,61 +60,87 @@ def extract_odds_from_match(match):
 
 def fetch_match_details(match_id):
     """Fetch detailed data for a specific match"""
-    url = f"https://sports.highlightly.net/football/matches/{match_id}"
-    headers = {"x-rapidapi-key": API_KEY}
+    # CORRECTED: Using proper API endpoint
+    url = f"https://highlightly.net/api/football/matches/{match_id}"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Accept": "application/json"
+    }
     
     try:
         response = requests.get(url, headers=headers, timeout=20)
         if response.status_code == 200:
             return response.json()
         else:
-            st.error(f"Failed to fetch match details: {response.status_code}")
+            st.error(f"Failed to fetch match details: {response.status_code} - {response.text[:200]}")
             return None
     except Exception as e:
         st.error(f"Error fetching match details: {e}")
         return None
 
-def fetch_matches_with_retry(date_str, max_retries=3):
-    """Fetch matches with retry logic for 400 errors"""
-    url = "https://sports.highlightly.net/football/matches"
-    headers = {"x-rapidapi-key": API_KEY}
+def fetch_matches_by_date(date_str):
+    """Fetch matches for a specific date using corrected API"""
+    # CORRECTED: Using proper API endpoint
+    url = "https://highlightly.net/api/football/matches"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Accept": "application/json"
+    }
+    params = {
+        "date": date_str
+    }
     
-    # Try different parameter formats to avoid 400 error
-    param_formats = [
-        {"date": date_str, "limit": 200},
-        {"date": date_str, "limit": "200"},
-        {"date": date_str, "page": 1, "limit": 200},
-        {"date": date_str},
-        {"start_date": date_str, "end_date": date_str, "limit": 200},
-    ]
-    
-    for attempt in range(max_retries):
-        params = param_formats[attempt % len(param_formats)]
+    try:
+        st.info(f"Fetching from: {url} with date: {date_str}")
+        response = requests.get(url, headers=headers, params=params, timeout=30)
         
-        try:
-            st.info(f"Attempt {attempt + 1}: Trying with params: {params}")
-            response = requests.get(url, headers=headers, params=params, timeout=20)
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 401:
+            st.error("❌ Authentication failed! Please check your API key.")
+            st.info("Make sure you're using the correct API key format in your secrets.toml file")
+            return None
+        elif response.status_code == 404:
+            st.error(f"❌ No matches found for date: {date_str}")
+            return None
+        else:
+            st.error(f"API Error {response.status_code}: {response.text[:200]}")
+            return None
             
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 400:
-                st.warning(f"Attempt {attempt + 1} failed with 400. Trying different parameters...")
-                continue
-            else:
-                st.error(f"API Error: {response.status_code}")
-                return None
-        except Exception as e:
-            st.error(f"Attempt {attempt + 1} error: {e}")
-            continue
+    except requests.exceptions.Timeout:
+        st.error("Request timeout - API took too long to respond")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("Connection error - Cannot reach the API server")
+        return None
+    except Exception as e:
+        st.error(f"Unexpected error: {e}")
+        return None
+
+def fetch_available_leagues():
+    """Fetch all available leagues"""
+    url = "https://highlightly.net/api/football/leagues"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Accept": "application/json"
+    }
     
-    st.error("All attempts failed to fetch matches")
-    return None
+    try:
+        response = requests.get(url, headers=headers, timeout=20)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+    except Exception as e:
+        st.error(f"Error fetching leagues: {e}")
+        return None
 
 def display_match_details(match_data):
-    """Display detailed match information in a popup/expander"""
+    """Display detailed match information"""
     if not match_data:
         return
     
+    # Handle different response structures
     match = match_data.get("data", match_data)
     
     st.subheader("📊 MATCH DETAILS")
@@ -134,6 +160,12 @@ def display_match_details(match_data):
         if match.get('starting_at'):
             st.write(f"Kickoff: {match.get('starting_at')}")
     
+    # Scores if match is live or finished
+    scores = match.get("scores", {})
+    if scores:
+        st.markdown("**⚽ Current Score**")
+        st.write(f"Home: {scores.get('home', 0)} - Away: {scores.get('away', 0)}")
+    
     # Head to head stats if available
     h2h = match.get("head_to_head", {})
     if h2h:
@@ -146,15 +178,11 @@ def display_match_details(match_data):
         st.markdown("**📊 Recent Form**")
         col1, col2 = st.columns(2)
         with col1:
-            st.write(f"Home Team Form: {form.get('home', {}).get('form', 'N/A')}")
+            home_form = form.get('home', {}).get('form', 'N/A')
+            st.write(f"Home Team Form: {home_form}")
         with col2:
-            st.write(f"Away Team Form: {form.get('away', {}).get('form', 'N/A')}")
-    
-    # Odds movement
-    odds_history = match.get("odds_history", [])
-    if odds_history:
-        st.markdown("**📉 Odds Movement**")
-        st.dataframe(odds_history[:10])
+            away_form = form.get('away', {}).get('form', 'N/A')
+            st.write(f"Away Team Form: {away_form}")
 
 # Sidebar
 with st.sidebar:
@@ -169,17 +197,41 @@ with st.sidebar:
     # Show odds type
     show_only_real_odds = st.checkbox("Show only matches with real odds", value=False)
     
+    # Option to fetch leagues
+    if st.button("📋 SHOW AVAILABLE LEAGUES", use_container_width=True):
+        with st.spinner("Fetching leagues..."):
+            leagues_data = fetch_available_leagues()
+            if leagues_data:
+                st.session_state.leagues = leagues_data
+                st.success("✅ Leagues loaded!")
+                st.rerun()
+    
+    # Display leagues if available
+    if st.session_state.get("leagues"):
+        with st.expander("Available Leagues"):
+            leagues = st.session_state.leagues.get("data", st.session_state.leagues)
+            if isinstance(leagues, list):
+                for league in leagues[:20]:  # Show first 20
+                    st.caption(f"• {league.get('name', 'Unknown')}")
+    
+    st.divider()
+    
     if st.button("FETCH MATCHES", type="primary", use_container_width=True):
         with st.spinner("Fetching matches..."):
-            data = fetch_matches_with_retry(date_str)
+            data = fetch_matches_by_date(date_str)
             
             if data:
                 matches = data.get("data", []) if isinstance(data, dict) else data
-                st.session_state.all_matches = matches
-                st.session_state.raw_matches = matches
-                st.session_state.selected_match = None
-                st.success(f"✅ Found {len(matches)} matches!")
-                st.rerun()
+                if matches:
+                    st.session_state.all_matches = matches
+                    st.session_state.raw_matches = matches
+                    st.session_state.selected_match = None
+                    st.success(f"✅ Found {len(matches)} matches!")
+                    st.rerun()
+                else:
+                    st.warning(f"No matches found on {date_str}")
+            else:
+                st.error("Failed to fetch matches. Check API key and try again.")
 
 # Main content
 if st.session_state.get("all_matches"):
@@ -209,7 +261,7 @@ if st.session_state.get("all_matches"):
     if "selected_match_data" not in st.session_state:
         st.session_state.selected_match_data = None
     
-    # Display matches in a grid with buttons
+    # Display matches in a compact grid
     for idx, match in enumerate(filtered):
         # Extract basic data
         home = match.get("homeTeam", {}).get("name", "?")
@@ -260,7 +312,7 @@ if st.session_state.get("all_matches"):
         with col2:
             st.markdown(f"🎲 **Odds:** {home_odds:.2f} | {draw_odds:.2f} | {away_odds:.2f}")
             if not has_real_odds:
-                st.caption("⚠️ Default odds")
+                st.caption("⚠️ Default odds (no bookmaker data)")
         
         with col3:
             st.markdown(f"<span style='color:{color}'>**{verdict_icon} {verdict}**</span>", unsafe_allow_html=True)
@@ -285,7 +337,9 @@ if st.session_state.get("all_matches"):
         
         # Limit display for performance
         if idx >= 99:
-            st.info(f"... and {len(filtered) - 100} more matches")
+            remaining = len(filtered) - 100
+            if remaining > 0:
+                st.info(f"... and {remaining} more matches")
             break
     
     # Display selected match details in an expandable section
@@ -298,8 +352,11 @@ if st.session_state.get("all_matches"):
                 st.session_state.selected_match_data = None
                 st.rerun()
 
-elif st.session_state.get("all_matches") is not None and len(st.session_state.all_matches) == 0:
-    st.warning(f"No matches found on {date_str}")
+elif st.session_state.get("all_matches") is not None:
+    if len(st.session_state.all_matches) == 0:
+        st.warning(f"No matches found on {date_str}")
+    else:
+        st.info("👈 Click 'FETCH MATCHES' to load matches")
 else:
     st.info("👈 Click 'FETCH MATCHES' to get today's fixtures")
 
@@ -307,11 +364,12 @@ else:
 st.divider()
 st.caption(f"Match Oracle | Data from Highlightly API | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# Additional debug info in sidebar
+# Debug info in sidebar
 with st.sidebar:
     st.divider()
     st.caption("Debug Info:")
     if st.session_state.get("all_matches"):
-        st.caption(f"Total matches loaded: {len(st.session_state.all_matches)}")
+        st.caption(f"📊 Total matches: {len(st.session_state.all_matches)}")
     if st.session_state.get("selected_match_data"):
         st.caption("✅ Match details loaded")
+    st.caption(f"🔑 API Key loaded: {'Yes' if API_KEY else 'No'}")
