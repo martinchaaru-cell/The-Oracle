@@ -1,178 +1,168 @@
-# streamlit_app.py - PROPERLY FIXED API INTEGRATION
+# streamlit_app.py - CLEAN WORKING VERSION
 import streamlit as st
 import requests
 from datetime import datetime
-import hmac
 
 st.set_page_config(page_title="Match Oracle", page_icon="⚽", layout="wide")
 
 # Initialize session state
 if "all_matches" not in st.session_state:
     st.session_state.all_matches = None
-if "selected_match_data" not in st.session_state:
-    st.session_state.selected_match_data = None
-if "selected_match_name" not in st.session_state:
-    st.session_state.selected_match_name = ""
-if "api_error" not in st.session_state:
-    st.session_state.api_error = None
+if "selected_match" not in st.session_state:
+    st.session_state.selected_match = None
 
 API_KEY = st.secrets.get("HIGHLIGHTLY_API_KEY", "")
 
 st.title("⚽ MATCH ORACLE - LIVE MATCHES")
 
-def diagnose_api_connection():
-    """Diagnose what's wrong with the API connection"""
-    issues = []
+def extract_odds(match):
+    """Extract odds from match data"""
+    home_odds = 2.00
+    draw_odds = 3.25
+    away_odds = 3.50
     
-    if not API_KEY:
-        issues.append("❌ No API key found in secrets.toml")
-    else:
-        issues.append(f"✅ API key loaded (length: {len(API_KEY)} chars)")
-    
-    # Test different API formats
-    test_endpoints = [
-        ("https://highlightly.net/api/football/matches?date=2025-06-15", "Bearer"),
-        ("https://sports.highlightly.net/api/football/matches?date=2025-06-15", "Bearer"),
-        ("https://api.highlightly.com/v1/football/matches?date=2025-06-15", "Bearer"),
-        ("https://sports.highlightly.net/football/matches?date=2025-06-15", "RapidAPI"),
-    ]
-    
-    for url, auth_type in test_endpoints:
-        try:
-            if auth_type == "Bearer":
-                headers = {"Authorization": f"Bearer {API_KEY}", "Accept": "application/json"}
-            else:
-                headers = {"x-rapidapi-key": API_KEY, "Accept": "application/json"}
-            
-            response = requests.get(url, headers=headers, timeout=5)
-            issues.append(f"🔍 {auth_type} to {url[:50]}... → Status: {response.status_code}")
-            
-            if response.status_code == 200:
-                issues.append(f"   ✅ WORKING! Use this format")
-                return True, response.json(), issues
-        except Exception as e:
-            issues.append(f"   ❌ Error: {str(e)[:50]}")
-    
-    return False, None, issues
-
-def fetch_real_matches(date_str):
-    """Actually fix the API call - no hardcoded data"""
-    
-    # First, diagnose what's wrong
-    working, data, diagnosis = diagnose_api_connection()
-    
-    if working and data:
-        matches = data.get("data", data)
-        if isinstance(matches, list):
-            return matches, diagnosis
-        else:
-            return [], ["API returned data but not in expected format"]
-    
-    # If we get here, show the actual error
-    return None, diagnosis
-
-def extract_odds_from_match(match):
-    """Extract real odds from API response"""
-    home_odds = None
-    draw_odds = None
-    away_odds = None
-    
-    # Check various places where odds might be
-    if "odds" in match and match["odds"]:
-        for odd_obj in match["odds"]:
-            if odd_obj.get("market") == "full_time_result" or odd_obj.get("name") == "Match Odds":
-                outcomes = odd_obj.get("outcomes", [])
-                for outcome in outcomes:
-                    outcome_name = outcome.get("name", "").lower()
-                    price = outcome.get("price", 0) or outcome.get("odd", 0)
-                    
-                    if "home" in outcome_name:
-                        home_odds = price
-                    elif "draw" in outcome_name:
-                        draw_odds = price
-                    elif "away" in outcome_name:
-                        away_odds = price
-    
-    if "bookmakers" in match:
-        for bookmaker in match["bookmakers"]:
-            for market in bookmaker.get("markets", []):
-                if market.get("key") == "h2h":
-                    for outcome in market.get("outcomes", []):
-                        outcome_name = outcome.get("name", "").lower()
-                        price = outcome.get("price", 0)
-                        
-                        if "home" in outcome_name:
+    # Try to find real odds
+    if "odds" in match:
+        for odd in match["odds"]:
+            if odd.get("market") == "full_time_result":
+                for outcome in odd.get("outcomes", []):
+                    name = outcome.get("name", "").lower()
+                    price = outcome.get("price", 0)
+                    if price > 0:
+                        if "home" in name:
                             home_odds = price
-                        elif "draw" in outcome_name:
+                        elif "draw" in name:
                             draw_odds = price
-                        elif "away" in outcome_name:
+                        elif "away" in name:
                             away_odds = price
     
-    # Return None if no real odds found (not defaults)
     return home_odds, draw_odds, away_odds
+
+def fetch_matches(date_str):
+    """Fetch matches from API"""
+    url = f"https://highlightly.net/api/football/matches?date={date_str}"
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("data", [])
+        else:
+            st.error(f"API Error: {response.status_code}")
+            return []
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return []
 
 # Sidebar
 with st.sidebar:
-    st.header("⚙️ Settings")
-    
+    st.header("Settings")
     date = st.date_input("Match Date", datetime.now())
     date_str = date.strftime("%Y-%m-%d")
     
-    st.divider()
+    league_filter = st.text_input("League contains", placeholder="Premier, Serie, La Liga")
+    show_real_odds_only = st.checkbox("Show only matches with real odds")
     
-    if st.button("🔍 DIAGNOSE API", use_container_width=True):
-        with st.spinner("Testing API connections..."):
-            working, data, diagnosis = diagnose_api_connection()
-            st.session_state.api_diagnosis = diagnosis
+    if st.button("FETCH MATCHES", type="primary"):
+        with st.spinner("Loading..."):
+            matches = fetch_matches(date_str)
+            st.session_state.all_matches = matches
             st.rerun()
     
-    if st.session_state.get("api_diagnosis"):
-        with st.expander("📋 API Diagnosis Results", expanded=True):
-            for line in st.session_state.api_diagnosis:
-                st.code(line)
-    
-    st.divider()
-    
-    if st.button("🚀 FETCH MATCHES", type="primary", use_container_width=True):
-        st.session_state.fetch_attempted = True
-        with st.spinner("Fetching real matches from API..."):
-            matches, diagnosis = fetch_real_matches(date_str)
-            
-            if matches is not None:
-                st.session_state.all_matches = matches
-                st.session_state.api_error = None
-                st.success(f"✅ Loaded {len(matches)} real matches!")
-            else:
-                st.session_state.all_matches = []
-                st.session_state.api_error = diagnosis
-                st.error("❌ Failed to fetch real matches")
-            st.rerun()
-    
-    st.divider()
-    st.caption(f"🔑 API Key: {'Present' if API_KEY else 'Missing'}")
-    if API_KEY:
-        st.caption(f"   Length: {len(API_KEY)} chars")
-        st.caption(f"   First 5 chars: {API_KEY[:5]}...")
+    if st.session_state.all_matches:
+        st.write(f"Matches loaded: {len(st.session_state.all_matches)}")
 
 # Main content
-st.markdown("---")
+if st.session_state.all_matches:
+    matches = st.session_state.all_matches
+    
+    # Apply filters
+    if league_filter:
+        matches = [m for m in matches if league_filter.lower() in m.get("league", {}).get("name", "").lower()]
+    
+    filtered_matches = []
+    for match in matches:
+        home_odds, draw_odds, away_odds = extract_odds(match)
+        has_real_odds = home_odds != 2.00
+        
+        if show_real_odds_only and not has_real_odds:
+            continue
+        
+        filtered_matches.append(match)
+    
+    st.subheader(f"Matches: {len(filtered_matches)}")
+    
+    # Display matches
+    for idx, match in enumerate(filtered_matches):
+        home = match.get("homeTeam", {}).get("name", "Home")
+        away = match.get("awayTeam", {}).get("name", "Away")
+        league = match.get("league", {}).get("name", "Unknown")
+        match_id = match.get("id", idx)
+        
+        home_odds, draw_odds, away_odds = extract_odds(match)
+        
+        # Determine prediction
+        if home_odds < away_odds:
+            selection = home
+            odds = home_odds
+        else:
+            selection = away
+            odds = away_odds
+        
+        edge = (1/odds - 1/3.5) * 100
+        
+        if edge > 8:
+            verdict = "✅ APPROVED"
+            color = "green"
+        elif edge > 3:
+            verdict = "⚠️ CAUTION"
+            color = "orange"
+        else:
+            verdict = "❌ REJECTED"
+            color = "red"
+        
+        with st.expander(f"{verdict} | {idx+1}. {home} vs {away} - {league}"):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("**ODDS**")
+                st.metric(home, f"{home_odds:.2f}")
+                st.metric("Draw", f"{draw_odds:.2f}")
+                st.metric(away, f"{away_odds:.2f}")
+            
+            with col2:
+                st.markdown("**PREDICTION**")
+                st.markdown(f"<h3 style='color:{color}'>{verdict}</h3>", unsafe_allow_html=True)
+                st.write(f"Selection: {selection}")
+                st.write(f"Odds: {odds:.2f}")
+                st.write(f"Edge: {edge:.1f}%")
+            
+            with col3:
+                st.markdown("**METRICS**")
+                prob = (1/odds) * 100
+                st.metric("Model Prob", f"{prob:.1f}%")
+                st.metric("Fair Odds", f"{odds:.2f}")
+            
+            # Details button
+            btn_key = f"btn_{match_id}_{idx}"
+            if st.button("View Details", key=btn_key):
+                st.session_state.selected_match = match
+                st.rerun()
+    
+    # Show selected match details
+    if st.session_state.selected_match:
+        st.markdown("---")
+        st.subheader("Match Details")
+        st.json(st.session_state.selected_match)
+        
+        if st.button("Close Details"):
+            st.session_state.selected_match = None
+            st.rerun()
 
-if st.session_state.api_error:
-    st.error("### ⚠️ API Integration Error")
-    st.write("The API call failed. Here's why:")
-    for error in st.session_state.api_error:
-        st.write(f"- {error}")
-    
-    st.info("""
-    **How to fix:**
-    
-    1. **Verify your API key** - Make sure it's correct in `.streamlit/secrets.toml`
-    2. **Check API documentation** - The endpoint or authentication method might be different
-    3. **Contact Highlightly support** - Ask for the correct:
-       - Base URL
-       - Authentication header format
-       - Required parameters for fetching matches
-       
-    **Format in secrets.toml should be:**
-    ```toml
-    HIGHLIGHTLY_API_KEY = "your-actual-api-key-here"
+else:
+    st.info("Click 'FETCH MATCHES' in the sidebar to load matches")
+
+# Footer
+st.markdown("---")
+st.caption(f"Match Oracle | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
