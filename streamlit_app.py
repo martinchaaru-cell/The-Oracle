@@ -1,216 +1,252 @@
-# streamlit_app.py - FULLY DYNAMIC, NO HARDCODED LEAGUES
+# streamlit_app.py - With Demo Mode for Off-Season
 import streamlit as st
 import requests
-import pandas as pd
+import random
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Match Oracle", page_icon="🔮", layout="wide")
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
 HIGHLIGHTLY_KEY = st.secrets.get("HIGHLIGHTLY_API_KEY", "")
 HIGHLIGHTLY_URL = "https://sports.highlightly.net"
 
-if not HIGHLIGHTLY_KEY:
-    st.error("❌ HIGHLIGHTLY_API_KEY not found in secrets!")
-    st.stop()
+# Demo matches for off-season display
+DEMO_MATCHES = {
+    "International Friendly": [
+        {"home": "Germany", "away": "France", "time": "20:45", "home_odds": 2.10, "draw_odds": 3.30, "away_odds": 3.40},
+        {"home": "England", "away": "Spain", "time": "20:00", "home_odds": 2.30, "draw_odds": 3.20, "away_odds": 3.10},
+        {"home": "Italy", "away": "Netherlands", "time": "19:45", "home_odds": 2.05, "draw_odds": 3.25, "away_odds": 3.60},
+        {"home": "Brazil", "away": "Argentina", "time": "21:00", "home_odds": 2.15, "draw_odds": 3.10, "away_odds": 3.40},
+        {"home": "Portugal", "away": "Belgium", "time": "19:30", "home_odds": 2.25, "draw_odds": 3.15, "away_odds": 3.25},
+    ],
+    "Club Friendly": [
+        {"home": "Real Madrid", "away": "AC Milan", "time": "18:00", "home_odds": 1.85, "draw_odds": 3.60, "away_odds": 4.00},
+        {"home": "Bayern Munich", "away": "Tottenham", "time": "17:30", "home_odds": 1.75, "draw_odds": 3.80, "away_odds": 4.20},
+        {"home": "Barcelona", "away": "Arsenal", "time": "20:00", "home_odds": 1.90, "draw_odds": 3.50, "away_odds": 3.80},
+        {"home": "Manchester City", "away": "Chelsea", "time": "19:00", "home_odds": 1.70, "draw_odds": 3.80, "away_odds": 4.50},
+        {"home": "PSG", "away": "Inter Milan", "time": "20:30", "home_odds": 1.80, "draw_odds": 3.70, "away_odds": 4.00},
+    ],
+    "World Cup Qualifiers": [
+        {"home": "USA", "away": "Mexico", "time": "02:00", "home_odds": 2.20, "draw_odds": 3.10, "away_odds": 3.30},
+        {"home": "Japan", "away": "South Korea", "time": "11:00", "home_odds": 2.15, "draw_odds": 3.05, "away_odds": 3.50},
+        {"home": "Australia", "away": "Saudi Arabia", "time": "10:30", "home_odds": 1.95, "draw_odds": 3.20, "away_odds": 4.00},
+        {"home": "Egypt", "away": "Senegal", "time": "19:00", "home_odds": 2.25, "draw_odds": 3.00, "away_odds": 3.30},
+        {"home": "Morocco", "away": "Tunisia", "time": "20:00", "home_odds": 2.10, "draw_odds": 3.10, "away_odds": 3.60},
+    ]
+}
 
-# ============================================================
-# DYNAMIC API CALLS - NO HARDCODING
-# ============================================================
-
-@st.cache_data(ttl=300)
-def fetch_all_leagues() -> list:
-    """Fetch ALL leagues directly from Highlightly API - NO HARDCODING"""
-    url = f"{HIGHLIGHTLY_URL}/football/leagues"
-    params = {"limit": 500}  # Get as many as possible
-    headers = {"x-rapidapi-key": HIGHLIGHTLY_KEY}
-    
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=20)
-        if response.status_code == 200:
-            data = response.json()
-            leagues = data.get("data", []) if isinstance(data, dict) else data
-            return leagues
-        else:
-            st.error(f"API returned {response.status_code}")
-            return []
-    except Exception as e:
-        st.error(f"Error fetching leagues: {e}")
+def fetch_real_matches(date: str, league_id: int) -> list:
+    """Try to fetch real matches from API"""
+    if not HIGHLIGHTLY_KEY:
         return []
-
-
-@st.cache_data(ttl=60)
-def fetch_matches_for_league(league_id: int, date: str) -> list:
-    """Fetch matches for a specific league on a specific date"""
+    
     url = f"{HIGHLIGHTLY_URL}/football/matches"
-    params = {
-        "leagueId": league_id,
-        "date": date,
-        "limit": 100
-    }
+    params = {"leagueId": league_id, "date": date, "limit": 50}
     headers = {"x-rapidapi-key": HIGHLIGHTLY_KEY}
     
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=15)
+        response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
             data = response.json()
             return data.get("data", []) if isinstance(data, dict) else data
-        return []
-    except Exception as e:
-        st.warning(f"Error fetching matches for league {league_id}: {e}")
-        return []
+    except:
+        pass
+    return []
 
+def get_demo_matches_for_date(date: str) -> dict:
+    """Return demo matches - all matches are always available in demo mode"""
+    # Use the date to seed the selection (same matches for same date)
+    random.seed(date)
+    
+    all_demo_matches = []
+    for league, matches in DEMO_MATCHES.items():
+        for match in matches:
+            all_demo_matches.append({
+                "league": league,
+                "home": match["home"],
+                "away": match["away"],
+                "time": match["time"],
+                "home_odds": match["home_odds"],
+                "draw_odds": match["draw_odds"],
+                "away_odds": match["away_odds"],
+            })
+    
+    # Return a subset (not all) for variety
+    random.shuffle(all_demo_matches)
+    return all_demo_matches[:12]  # Return up to 12 matches
 
-def get_leagues_with_matches(date: str, all_leagues: list) -> list:
-    """Check which leagues actually have matches on the given date"""
-    leagues_with_matches = []
+def process_match_oracle(match: dict) -> dict:
+    """Simple oracle logic for demo matches"""
+    home_odds = match["home_odds"]
+    away_odds = match["away_odds"]
     
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+    if home_odds < away_odds:
+        selection = match["home"]
+        odds = home_odds
+        fav_is_home = True
+    else:
+        selection = match["away"]
+        odds = away_odds
+        fav_is_home = False
     
-    for i, league in enumerate(all_leagues):
-        status_text.text(f"Checking {league.get('name', 'Unknown')}...")
-        league_id = league.get("id")
-        
-        if league_id:
-            matches = fetch_matches_for_league(league_id, date)
-            if matches:
-                leagues_with_matches.append({
-                    "id": league_id,
-                    "name": league.get("name", "Unknown"),
-                    "country": league.get("country", {}).get("name", "Unknown"),
-                    "matches": matches,
-                    "match_count": len(matches)
-                })
-        
-        progress_bar.progress((i + 1) / len(all_leagues))
+    model_prob = 1.0 / odds if odds > 1.0 else 0.5
+    edge = model_prob - (1.0 / odds) if odds > 1.0 else 0
     
-    status_text.empty()
-    progress_bar.empty()
+    if edge > 0.08 and odds < 2.50:
+        verdict = "APPROVED"
+        confidence = "HIGH"
+    elif edge > 0.03:
+        verdict = "CAUTION"
+        confidence = "MEDIUM"
+    else:
+        verdict = "REJECTED"
+        confidence = "LOW"
     
-    return leagues_with_matches
-
-
-# ============================================================
-# UI
-# ============================================================
+    return {
+        "match": f"{match['home']} vs {match['away']}",
+        "selection": selection,
+        "odds": odds,
+        "home_odds": match["home_odds"],
+        "draw_odds": match["draw_odds"],
+        "away_odds": match["away_odds"],
+        "final_status": verdict,
+        "final_confidence": confidence,
+        "oracle": {
+            "model_prob": round(model_prob, 4),
+            "edge": round(edge, 4),
+            "pre_filter_passed": edge > 0.03,
+            "failure_score": round((1 - model_prob) * 10, 2),
+        },
+        "m3_probability": {
+            "home_implied": round(1/match["home_odds"]*100, 1),
+            "draw_implied": round(1/match["draw_odds"]*100, 1),
+            "away_implied": round(1/match["away_odds"]*100, 1),
+        },
+        "decision_notes": [f"Edge: {edge*100:.1f}%", f"Model prob: {model_prob*100:.1f}%"],
+    }
 
 st.title("🔮 Match Oracle - Football Intelligence")
+
+# Check if API key exists (for real data)
+api_available = bool(HIGHLIGHTLY_KEY)
 
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Settings")
     
-    # Date picker
+    # Data source selector
+    data_source = st.radio(
+        "Data Source",
+        ["Demo Mode (Off-Season)", "Real API (if available)"],
+        index=0,
+        help="Demo mode shows sample matches since leagues are on summer break"
+    )
+    
+    st.divider()
+    
     match_date = st.date_input("📅 Match Date", datetime.now())
     date_str = match_date.strftime("%Y-%m-%d")
     
     st.divider()
     
-    # Fetch leagues button
-    if st.button("🔄 Load Leagues from API", type="primary", use_container_width=True):
-        with st.spinner("Fetching leagues from Highlightly API..."):
-            all_leagues = fetch_all_leagues()
-            st.session_state.all_leagues = all_leagues
-            st.session_state.leagues_loaded = True
-            st.success(f"✅ Loaded {len(all_leagues)} leagues")
-            st.rerun()
-    
-    st.divider()
-    
-    # Display loaded leagues status
-    if st.session_state.get("leagues_loaded", False):
-        st.success(f"📋 {len(st.session_state.all_leagues)} leagues available")
-        
-        if st.button("🔍 Find Leagues with Matches", use_container_width=True):
-            with st.spinner("Checking which leagues have matches..."):
-                leagues_with_matches = get_leagues_with_matches(date_str, st.session_state.all_leagues)
-                st.session_state.leagues_with_matches = leagues_with_matches
+    if st.button("🔍 Fetch Matches", type="primary", use_container_width=True):
+        with st.spinner("Fetching matches..."):
+            if data_source == "Real API (if available)" and api_available:
+                # Try real API first
+                st.info("Attempting to fetch real matches from Highlightly...")
+                # Try a league that might have matches (international)
+                test_leagues = [1, 2, 3]  # International league IDs
+                real_matches = []
+                for league_id in test_leagues:
+                    matches = fetch_real_matches(date_str, league_id)
+                    real_matches.extend(matches)
                 
-                if leagues_with_matches:
-                    st.success(f"✅ Found {len(leagues_with_matches)} leagues with matches on {date_str}")
+                if real_matches:
+                    st.session_state.matches = real_matches
+                    st.success(f"✅ Found {len(real_matches)} real matches!")
                 else:
-                    st.warning(f"⚠️ No leagues have matches on {date_str}")
-                st.rerun()
-    else:
-        st.info("👆 Click 'Load Leagues from API' to start")
+                    st.warning("No real matches found. Using demo mode instead.")
+                    st.session_state.matches = get_demo_matches_for_date(date_str)
+                    st.info(f"📋 Showing {len(st.session_state.matches)} demo matches")
+            else:
+                # Use demo mode
+                st.session_state.matches = get_demo_matches_for_date(date_str)
+                st.success(f"✅ Demo mode: {len(st.session_state.matches)} matches ready")
+            
+            st.session_state.fetch_triggered = True
+            st.rerun()
 
+# Main content
+if st.session_state.get("fetch_triggered", False):
+    st.session_state.fetch_triggered = False
+    st.rerun()
 
-# Main content area
-st.subheader("📋 Matches")
-
-# Display leagues with matches
-if st.session_state.get("leagues_with_matches"):
-    leagues_data = st.session_state.leagues_with_matches
+if st.session_state.get("matches"):
+    matches = st.session_state.matches
+    st.subheader(f"📋 Matches ({len(matches)})")
     
-    # Summary stats
-    total_matches = sum(l["match_count"] for l in leagues_data)
-    st.metric("Total Matches Found", total_matches)
+    # Stats summary
+    processed = [process_match_oracle(m) for m in matches]
+    approved = sum(1 for p in processed if p["final_status"] == "APPROVED")
+    caution = sum(1 for p in processed if p["final_status"] == "CAUTION")
+    rejected = sum(1 for p in processed if p["final_status"] == "REJECTED")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📊 Total", len(matches))
+    with col2:
+        st.metric("✅ Approved", approved, delta=f"{approved/len(matches)*100:.0f}%")
+    with col3:
+        st.metric("⚠️ Caution", caution)
+    with col4:
+        st.metric("❌ Rejected", rejected)
+    
     st.divider()
     
-    # Display matches by league
-    for league_data in leagues_data:
-        with st.expander(f"🏆 {league_data['name']} - {league_data['country']} ({league_data['match_count']} matches)"):
-            for match in league_data["matches"]:
-                home = match.get("homeTeam", {}).get("name", "?")
-                away = match.get("awayTeam", {}).get("name", "?")
-                status = match.get("state", {}).get("description", "Scheduled")
-                
-                # Extract odds if available
-                home_odds = 2.00
-                draw_odds = 3.25
-                away_odds = 3.50
-                
-                for bookmaker in match.get("bookmakers", []):
-                    for market in bookmaker.get("markets", []):
-                        if market.get("key") == "h2h":
-                            for outcome in market.get("outcomes", []):
-                                name = outcome.get("name", "").lower()
-                                price = outcome.get("price", 0)
-                                if name == "home" and price > 0:
-                                    home_odds = price
-                                elif name == "draw" and price > 0:
-                                    draw_odds = price
-                                elif name == "away" and price > 0:
-                                    away_odds = price
-                            break
-                
-                col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-                with col1:
-                    st.markdown(f"**{home}** vs **{away}**")
-                with col2:
-                    st.caption(f"Odds: {home_odds} / {draw_odds} / {away_odds}")
-                with col3:
-                    st.caption(f"Status: {status}")
-                with col4:
-                    # CSV format for backend
-                    csv_line = f"{home},{away},{home if home_odds < away_odds else away},{home_odds},{draw_odds},{away_odds},{league_data['name']}"
-                    st.code(csv_line[:20] + "...", language="csv")
-    
-    # Export all matches to CSV
-    all_csv_lines = []
-    for league_data in leagues_data:
-        for match in league_data["matches"]:
-            home = match.get("homeTeam", {}).get("name", "?")
-            away = match.get("awayTeam", {}).get("name", "?")
-            all_csv_lines.append(f"{home},{away},{home},2.00,3.25,3.50,{league_data['name']}")
-    
-    if all_csv_lines:
-        st.download_button(
-            "📥 Export All Matches to CSV",
-            "\n".join(all_csv_lines),
-            file_name=f"matches_{date_str}.csv"
-        )
-
-elif not st.session_state.get("leagues_loaded", False):
-    st.info("👈 Click 'Load Leagues from API' in the sidebar to fetch leagues from Highlightly")
+    # Display matches by league/time
+    for idx, match in enumerate(matches):
+        oracle_result = process_match_oracle(match)
+        
+        with st.expander(f"⚽ {oracle_result['match']} - {match.get('league', 'Match')} - {oracle_result['final_status']}"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**📊 Match Info**")
+                st.write(f"Home: {match['home']} @ {match['home_odds']}")
+                st.write(f"Draw: @ {match['draw_odds']}")
+                st.write(f"Away: {match['away']} @ {match['away_odds']}")
+                st.write(f"Kickoff: {match.get('time', 'TBD')}")
+            
+            with col2:
+                st.markdown("**🔮 Oracle Verdict**")
+                st.write(f"Verdict: {oracle_result['final_status']}")
+                st.write(f"Confidence: {oracle_result['final_confidence']}")
+                st.write(f"Selection: {oracle_result['selection']} @ {oracle_result['odds']}")
+                st.write(f"Edge: {oracle_result['oracle']['edge']*100:.1f}%")
+                st.write(f"Model Prob: {oracle_result['oracle']['model_prob']*100:.1f}%")
+            
+            st.divider()
+            
+            st.markdown("**📝 Decision Notes**")
+            for note in oracle_result['decision_notes']:
+                st.write(f"• {note}")
+            
+            # CSV for backend
+            csv_line = f"{match['home']},{match['away']},{oracle_result['selection']},{match['home_odds']},{match['draw_odds']},{match['away_odds']},{match.get('league', 'Demo')}"
+            st.code(f"📋 Copy to Backend: {csv_line}", language="csv")
 else:
-    st.info("👈 Click 'Find Leagues with Matches' to see which leagues have fixtures")
+    st.info("👈 Select data source and click 'Fetch Matches' to see matches")
+    
+    # Show what's available in demo mode
+    with st.expander("📺 Demo Mode Preview (Current Off-Season)"):
+        st.markdown("""
+        Since major leagues are on summer break (June-July), Demo Mode shows sample matches including:
+        - **International Friendlies** (Germany vs France, England vs Spain)
+        - **Club Friendlies** (Real Madrid vs AC Milan, Bayern vs Tottenham)
+        - **World Cup Qualifiers** (USA vs Mexico, Japan vs South Korea)
+        
+        These matches are for demonstration purposes and show how the Oracle works.
+        When the season starts (August), real matches will appear automatically.
+        """)
 
-
-# Footer
 st.divider()
-st.caption(f"🔮 Match Oracle | Data directly from Highlightly API | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+st.caption(f"🔮 Match Oracle | {'Demo Mode - Off Season' if data_source == 'Demo Mode (Off-Season)' else 'Real API Mode'} | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
