@@ -1,4 +1,4 @@
-# streamlit_app.py - DISPLAYS ALL LEG DATA (EXCLUDING ODDS)
+# streamlit_app.py - AUTO-DISPLAYS ALL LEG DATA
 import streamlit as st
 import requests
 from datetime import datetime
@@ -19,7 +19,7 @@ API_HOST = "sports.highlightly.net"
 st.title("⚽ MATCH ORACLE - LIVE MATCHES")
 
 def fetch_match_leg_data(match_id):
-    """Fetch complete leg data (excluding odds on free tier)"""
+    """Fetch complete leg data"""
     url = f"https://sports.highlightly.net/football/matches/{match_id}"
     headers = {
         "x-rapidapi-key": API_KEY,
@@ -31,8 +31,10 @@ def fetch_match_leg_data(match_id):
         if response.status_code == 200:
             return response.json()
         else:
+            st.error(f"API returned status {response.status_code}")
             return None
     except Exception as e:
+        st.error(f"Error: {str(e)}")
         return None
 
 def fetch_matches_by_date(date_str):
@@ -57,103 +59,31 @@ def fetch_matches_by_date(date_str):
                 return data
         return []
     except Exception as e:
+        st.error(f"Error fetching matches: {str(e)}")
         return []
 
-def display_leg_data(leg_data, match_name):
-    """Display all leg data excluding odds (since free tier has no odds)"""
-    st.subheader(f"📊 MATCH LEG DATA: {match_name}")
+def display_any_data(data, depth=0):
+    """Recursively display any data structure"""
+    if data is None:
+        st.write("No data available")
+        return
     
-    # Handle different response structures
-    if isinstance(leg_data, dict):
-        # If the response has a 'response' wrapper
-        if "response" in leg_data:
-            leg_data = leg_data["response"]
-        
-        # Display basic match info
-        st.markdown("### 🏟️ MATCH INFORMATION")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**HOME TEAM**")
-            home_team = leg_data.get("homeTeam", {})
-            st.write(f"Name: {home_team.get('name', 'N/A')}")
-            st.write(f"ID: {home_team.get('id', 'N/A')}")
-            if home_team.get('logo'):
-                st.image(home_team.get('logo'), width=50)
-        
-        with col2:
-            st.markdown("**AWAY TEAM**")
-            away_team = leg_data.get("awayTeam", {})
-            st.write(f"Name: {away_team.get('name', 'N/A')}")
-            st.write(f"ID: {away_team.get('id', 'N/A')}")
-            if away_team.get('logo'):
-                st.image(away_team.get('logo'), width=50)
-        
-        # League information
-        st.markdown("### 🏆 COMPETITION")
-        league = leg_data.get("league", {})
-        st.write(f"Name: {league.get('name', 'N/A')}")
-        st.write(f"Country: {league.get('country', 'N/A')}")
-        st.write(f"Season: {leg_data.get('season', {}).get('name', 'N/A')}")
-        st.write(f"Round: {leg_data.get('round', {}).get('name', 'N/A')}")
-        
-        # Match status
-        st.markdown("### 📅 MATCH STATUS")
-        status = leg_data.get("status", {})
-        st.write(f"Status: {status.get('long', 'N/A')}")
-        st.write(f"Short: {status.get('short', 'N/A')}")
-        if status.get('elapsed'):
-            st.write(f"Elapsed: {status.get('elapsed')} minutes")
-        
-        # Score if available
-        if leg_data.get("scores"):
-            st.markdown("### ⚽ SCORES")
-            scores = leg_data["scores"]
-            st.write(f"Home: {scores.get('home', 0)} - Away: {scores.get('away', 0)}")
-            if scores.get('halftime'):
-                st.write(f"Half-time: {scores['halftime'].get('home', 0)} - {scores['halftime'].get('away', 0)}")
-            if scores.get('fulltime'):
-                st.write(f"Full-time: {scores['fulltime'].get('home', 0)} - {scores['fulltime'].get('away', 0)}")
-        
-        # Venue information
-        if leg_data.get("venue"):
-            st.markdown("### 🏟️ VENUE")
-            venue = leg_data["venue"]
-            st.write(f"Name: {venue.get('name', 'N/A')}")
-            st.write(f"City: {venue.get('city', 'N/A')}")
-            if venue.get('capacity'):
-                st.write(f"Capacity: {venue.get('capacity')}")
-        
-        # Head to Head if available
-        if leg_data.get("head_to_head"):
-            st.markdown("### 📊 HEAD TO HEAD")
-            h2h = leg_data["head_to_head"]
-            st.write(f"Total matches: {h2h.get('total', 'N/A')}")
-            if h2h.get('home_wins') is not None:
-                st.write(f"Home wins: {h2h.get('home_wins')}")
-                st.write(f"Draws: {h2h.get('draws')}")
-                st.write(f"Away wins: {h2h.get('away_wins')}")
-        
-        # Recent form
-        if leg_data.get("form"):
-            st.markdown("### 📈 RECENT FORM")
-            form = leg_data["form"]
-            if form.get('home'):
-                st.write(f"Home team form: {form.get('home')}")
-            if form.get('away'):
-                st.write(f"Away team form: {form.get('away')}")
-        
-        # Note about odds
-        st.info("ℹ️ Odds data is not available in the free tier. Upgrade to access odds from 100+ bookmakers.")
-        
-        # Raw data expander
-        with st.expander("📄 View Raw API Response"):
-            st.json(leg_data)
-    
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, (dict, list)):
+                st.markdown(f"**{key.upper()}**")
+                display_any_data(value, depth + 1)
+            else:
+                st.write(f"**{key}:** {value}")
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, (dict, list)):
+                st.markdown(f"**Item {i+1}**")
+                display_any_data(item, depth + 1)
+            else:
+                st.write(f"**Item {i+1}:** {item}")
     else:
-        st.warning("No leg data available")
-        st.json(leg_data)
+        st.write(str(data))
 
 # Sidebar
 with st.sidebar:
@@ -172,12 +102,11 @@ with st.sidebar:
                 st.success(f"✅ Loaded {len(matches)} matches!")
             else:
                 st.session_state.all_matches = []
-                st.error("No matches found")
+                st.warning("No matches found")
             st.rerun()
     
     if st.session_state.all_matches:
         st.info(f"📊 {len(st.session_state.all_matches)} matches loaded")
-        st.caption("Click 'VIEW LEG DATA' on any match to see full details")
 
 # Main content
 if st.session_state.all_matches:
@@ -200,63 +129,125 @@ if st.session_state.all_matches:
         league = match.get("league", {}).get("name", "Unknown")
         match_id = match.get("id")
         
-        # Determine if odds might be available (free tier doesn't have them)
-        odds_status = "⚠️ No odds (free tier)"
-        
         with st.expander(f"{idx+1}. {home} vs {away} - {league}"):
-            col1, col2 = st.columns([3, 1])
+            st.write(f"**Match ID:** {match_id}")
+            st.write(f"**Status:** {match.get('status', {}).get('long', 'Scheduled')}")
             
-            with col1:
-                st.write(f"**Match ID:** {match_id}")
-                st.write(f"**Status:** {match.get('status', {}).get('long', 'Scheduled')}")
-                st.caption(odds_status)
-            
-            with col2:
-                # Button to fetch and display leg data
-                button_key = f"leg_btn_{match_id}_{idx}"
-                if st.button("📊 VIEW LEG DATA", key=button_key, use_container_width=True):
-                    with st.spinner(f"Fetching leg data for {home} vs {away}..."):
-                        leg_data = fetch_match_leg_data(match_id)
-                        if leg_data:
-                            st.session_state.selected_leg_data = leg_data
-                            st.session_state.selected_leg_name = f"{home} vs {away}"
-                            st.success(f"✅ Leg data loaded!")
-                        else:
-                            st.error(f"❌ Failed to load leg data")
+            # Button to fetch leg data
+            button_key = f"leg_btn_{match_id}_{idx}"
+            if st.button("📊 FETCH LEG DATA", key=button_key, use_container_width=True):
+                with st.spinner(f"Fetching leg data for {home} vs {away}..."):
+                    leg_data = fetch_match_leg_data(match_id)
+                    if leg_data:
+                        st.session_state.selected_leg_data = leg_data
+                        st.session_state.selected_leg_name = f"{home} vs {away}"
+                        st.success(f"✅ Leg data loaded successfully!")
                         st.rerun()
+                    else:
+                        st.error("Failed to load leg data")
     
-    # Display selected leg data
+    # Display selected leg data prominently
     if st.session_state.selected_leg_data:
         st.divider()
-        display_leg_data(st.session_state.selected_leg_data, st.session_state.selected_leg_name)
+        st.subheader(f"📊 LEG DATA: {st.session_state.selected_leg_name}")
         
-        col1, col2 = st.columns([1, 5])
-        with col1:
-            if st.button("❌ Close", use_container_width=True):
-                st.session_state.selected_leg_data = None
-                st.session_state.selected_leg_name = ""
-                st.rerun()
+        # Create tabs for different views
+        tab1, tab2, tab3 = st.tabs(["📋 Formatted View", "🔍 Raw JSON", "ℹ️ Info"])
+        
+        with tab1:
+            st.markdown("### Leg Data Contents")
+            leg_data = st.session_state.selected_leg_data
+            
+            # Check if data is wrapped in 'response' or 'data'
+            if isinstance(leg_data, dict):
+                if "response" in leg_data:
+                    leg_data = leg_data["response"]
+                elif "data" in leg_data:
+                    leg_data = leg_data["data"]
+            
+            # Display the data in a readable format
+            if isinstance(leg_data, dict):
+                # Extract key information if it exists
+                if "homeTeam" in leg_data:
+                    st.markdown("#### 🏠 Home Team")
+                    st.write(f"Name: {leg_data['homeTeam'].get('name', 'N/A')}")
+                    st.write(f"ID: {leg_data['homeTeam'].get('id', 'N/A')}")
+                
+                if "awayTeam" in leg_data:
+                    st.markdown("#### ✈️ Away Team")
+                    st.write(f"Name: {leg_data['awayTeam'].get('name', 'N/A')}")
+                    st.write(f"ID: {leg_data['awayTeam'].get('id', 'N/A')}")
+                
+                if "league" in leg_data:
+                    st.markdown("#### 🏆 League")
+                    st.write(f"Name: {leg_data['league'].get('name', 'N/A')}")
+                    st.write(f"Country: {leg_data['league'].get('country', 'N/A')}")
+                
+                if "status" in leg_data:
+                    st.markdown("#### 📅 Status")
+                    st.write(f"Long: {leg_data['status'].get('long', 'N/A')}")
+                    st.write(f"Short: {leg_data['status'].get('short', 'N/A')}")
+                    if leg_data['status'].get('elapsed'):
+                        st.write(f"Elapsed: {leg_data['status']['elapsed']} min")
+                
+                if "scores" in leg_data and leg_data["scores"]:
+                    st.markdown("#### ⚽ Scores")
+                    scores = leg_data["scores"]
+                    st.write(f"Home: {scores.get('home', 0)} - Away: {scores.get('away', 0)}")
+                
+                if "venue" in leg_data and leg_data["venue"]:
+                    st.markdown("#### 🏟️ Venue")
+                    venue = leg_data["venue"]
+                    st.write(f"Name: {venue.get('name', 'N/A')}")
+                    st.write(f"City: {venue.get('city', 'N/A')}")
+                    if venue.get('capacity'):
+                        st.write(f"Capacity: {venue['capacity']}")
+                
+                # If none of the above, display all keys
+                if not any(key in leg_data for key in ["homeTeam", "awayTeam", "league", "status"]):
+                    st.markdown("#### All Available Data")
+                    for key, value in leg_data.items():
+                        if not isinstance(value, (dict, list)):
+                            st.write(f"**{key}:** {value}")
+                        else:
+                            with st.expander(f"{key}"):
+                                st.json(value)
+            
+            elif isinstance(leg_data, list):
+                st.write(f"Array with {len(leg_data)} items")
+                for i, item in enumerate(leg_data[:5]):  # Show first 5
+                    st.write(f"**Item {i+1}:**")
+                    st.json(item)
+            else:
+                st.write(leg_data)
+        
+        with tab2:
+            st.json(st.session_state.selected_leg_data)
+        
+        with tab3:
+            st.markdown("""
+            **About Leg Data:**
+            - Leg data contains all available information about a specific match
+            - Free tier includes: teams, league, status, scores, venue
+            - Odds require paid tier upgrade
+            - Click 'Fetch Leg Data' on any match to see its details
+            """)
+        
+        if st.button("❌ Clear Leg Data", use_container_width=True):
+            st.session_state.selected_leg_data = None
+            st.session_state.selected_leg_name = ""
+            st.rerun()
 
 else:
     st.info("👈 Click 'FETCH MATCHES' to load matches")
     
-    with st.expander("ℹ️ About Leg Data"):
+    with st.expander("📖 How to use"):
         st.markdown("""
-        **What data is available in the free tier:**
-        - ✅ Team names and IDs
-        - ✅ League and competition info
-        - ✅ Match status (scheduled, live, finished)
-        - ✅ Scores (when available)
-        - ✅ Venue information
-        - ✅ Head-to-head stats
-        - ✅ Recent form
-        - ❌ Odds (requires paid tier)
-        
-        **To see leg data:**
-        1. Click "FETCH MATCHES" to load matches
-        2. Click "VIEW LEG DATA" on any match
-        3. All available data will be displayed below
+        1. **Click 'FETCH MATCHES'** - Loads all matches for selected date
+        2. **Expand any match** - Click on a match to see basic info
+        3. **Click 'FETCH LEG DATA'** - Loads complete details for that match
+        4. **View leg data** - See teams, league, status, scores, venue, and more
         """)
 
 st.divider()
-st.caption(f"Match Oracle | Free Tier (No Odds) | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+st.caption(f"Match Oracle | Free Tier | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
