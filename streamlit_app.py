@@ -135,20 +135,25 @@ if st.session_state.all_matches:
                 leg_data = st.session_state.leg_data_cache[match_id]
                 
                 # Check if leg_data is valid
-                if leg_data and isinstance(leg_data, dict):
-                    # Check for error in response
-                    if "error" in leg_data:
+                if leg_data and isinstance(leg_data, (dict, list)):
+                    # Check for error in response (only dicts can have "error")
+                    if isinstance(leg_data, dict) and "error" in leg_data:
                         st.error(f"API Error: {leg_data['error']}")
                         if "status_code" in leg_data:
                             st.write(f"Status Code: {leg_data['status_code']}")
                     else:
                         # Unwrap the data
                         actual_data = leg_data
-                        if "response" in leg_data:
-                            actual_data = leg_data["response"]
-                        elif "data" in leg_data:
-                            actual_data = leg_data["data"]
-                        
+                        if isinstance(leg_data, dict):
+                            if "response" in leg_data:
+                                actual_data = leg_data["response"]
+                            elif "data" in leg_data:
+                                actual_data = leg_data["data"]
+
+                        # If the API returned a list, take the first match
+                        if isinstance(actual_data, list):
+                            actual_data = actual_data[0] if len(actual_data) > 0 else None
+
                         # Check if actual_data is valid
                         if actual_data and isinstance(actual_data, dict):
                             # Teams
