@@ -1,4 +1,4 @@
-# streamlit_app.py - LEG DATA DISPLAYS INSIDE EXPANDER
+# streamlit_app.py - WITH PROPER ERROR HANDLING
 import streamlit as st
 import requests
 from datetime import datetime
@@ -26,9 +26,10 @@ def fetch_match_leg_data(match_id):
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             return response.json()
-        return None
+        else:
+            return {"error": f"API returned status {response.status_code}", "status_code": response.status_code}
     except Exception as e:
-        return None
+        return {"error": str(e)}
 
 def fetch_matches_by_date(date_str):
     """Fetch matches for a specific date"""
@@ -52,6 +53,7 @@ def fetch_matches_by_date(date_str):
                 return data
         return []
     except Exception as e:
+        st.error(f"Error fetching matches: {str(e)}")
         return []
 
 # Sidebar
@@ -102,6 +104,10 @@ if st.session_state.all_matches:
         league = match.get("league", {}).get("name", "Unknown")
         match_id = match.get("id")
         
+        # Ensure match_id is valid
+        if not match_id:
+            continue
+            
         expander_key = f"expander_{match_id}_{idx}"
         
         with st.expander(f"{idx+1}. {home} vs {away} - {league}", expanded=False):
@@ -128,68 +134,82 @@ if st.session_state.all_matches:
                 
                 leg_data = st.session_state.leg_data_cache[match_id]
                 
-                # Unwrap the data
-                if isinstance(leg_data, dict):
-                    if "response" in leg_data:
-                        leg_data = leg_data["response"]
-                    elif "data" in leg_data:
-                        leg_data = leg_data["data"]
-                
-                # Display the data
-                if leg_data:
-                    # Teams
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown("**🏠 HOME TEAM**")
-                        home_team = leg_data.get("homeTeam", {})
-                        st.write(f"Name: {home_team.get('name', 'N/A')}")
-                        st.write(f"ID: {home_team.get('id', 'N/A')}")
-                    
-                    with col2:
-                        st.markdown("**✈️ AWAY TEAM**")
-                        away_team = leg_data.get("awayTeam", {})
-                        st.write(f"Name: {away_team.get('name', 'N/A')}")
-                        st.write(f"ID: {away_team.get('id', 'N/A')}")
-                    
-                    # League
-                    st.markdown("**🏆 LEAGUE**")
-                    league_info = leg_data.get("league", {})
-                    st.write(f"Name: {league_info.get('name', 'N/A')}")
-                    st.write(f"Country: {league_info.get('country', 'N/A')}")
-                    
-                    # Status
-                    st.markdown("**📅 STATUS**")
-                    status = leg_data.get("status", {})
-                    st.write(f"Long: {status.get('long', 'N/A')}")
-                    st.write(f"Short: {status.get('short', 'N/A')}")
-                    
-                    # Scores
-                    scores = leg_data.get("scores", {})
-                    if scores:
-                        st.markdown("**⚽ SCORES**")
-                        st.write(f"Home: {scores.get('home', 0)}")
-                        st.write(f"Away: {scores.get('away', 0)}")
-                    
-                    # Venue
-                    venue = leg_data.get("venue", {})
-                    if venue:
-                        st.markdown("**🏟️ VENUE**")
-                        st.write(f"Name: {venue.get('name', 'N/A')}")
-                        st.write(f"City: {venue.get('city', 'N/A')}")
-                    
-                    # Show any additional fields
-                    other_fields = [k for k in leg_data.keys() if k not in ['homeTeam', 'awayTeam', 'league', 'status', 'scores', 'venue']]
-                    if other_fields:
-                        with st.expander("Additional Data"):
-                            for field in other_fields:
-                                st.write(f"**{field}:**")
-                                st.json(leg_data[field])
-                    
-                    # Raw JSON
-                    with st.expander("Raw API Response"):
-                        st.json(st.session_state.leg_data_cache[match_id])
+                # Check if leg_data is valid
+                if leg_data and isinstance(leg_data, dict):
+                    # Check for error in response
+                    if "error" in leg_data:
+                        st.error(f"API Error: {leg_data['error']}")
+                        if "status_code" in leg_data:
+                            st.write(f"Status Code: {leg_data['status_code']}")
+                    else:
+                        # Unwrap the data
+                        actual_data = leg_data
+                        if "response" in leg_data:
+                            actual_data = leg_data["response"]
+                        elif "data" in leg_data:
+                            actual_data = leg_data["data"]
+                        
+                        # Check if actual_data is valid
+                        if actual_data and isinstance(actual_data, dict):
+                            # Teams
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown("**🏠 HOME TEAM**")
+                                home_team = actual_data.get("homeTeam", {})
+                                if home_team:
+                                    st.write(f"Name: {home_team.get('name', 'N/A')}")
+                                    st.write(f"ID: {home_team.get('id', 'N/A')}")
+                                else:
+                                    st.write("No home team data")
+                            
+                            with col2:
+                                st.markdown("**✈️ AWAY TEAM**")
+                                away_team = actual_data.get("awayTeam", {})
+                                if away_team:
+                                    st.write(f"Name: {away_team.get('name', 'N/A')}")
+                                    st.write(f"ID: {away_team.get('id', 'N/A')}")
+                                else:
+                                    st.write("No away team data")
+                            
+                            # League
+                            league_info = actual_data.get("league", {})
+                            if league_info:
+                                st.markdown("**🏆 LEAGUE**")
+                                st.write(f"Name: {league_info.get('name', 'N/A')}")
+                                st.write(f"Country: {league_info.get('country', 'N/A')}")
+                            
+                            # Status
+                            status = actual_data.get("status", {})
+                            if status:
+                                st.markdown("**📅 STATUS**")
+                                st.write(f"Long: {status.get('long', 'N/A')}")
+                                st.write(f"Short: {status.get('short', 'N/A')}")
+                            
+                            # Scores
+                            scores = actual_data.get("scores", {})
+                            if scores and isinstance(scores, dict):
+                                st.markdown("**⚽ SCORES**")
+                                st.write(f"Home: {scores.get('home', 0)}")
+                                st.write(f"Away: {scores.get('away', 0)}")
+                            
+                            # Venue
+                            venue = actual_data.get("venue", {})
+                            if venue:
+                                st.markdown("**🏟️ VENUE**")
+                                st.write(f"Name: {venue.get('name', 'N/A')}")
+                                st.write(f"City: {venue.get('city', 'N/A')}")
+                            
+                            # Show raw response in expander
+                            with st.expander("Raw API Response"):
+                                st.json(leg_data)
+                        else:
+                            st.warning("No valid data in API response")
+                            st.write("Raw response:")
+                            st.json(leg_data)
                 else:
-                    st.warning("No leg data available")
+                    st.error("Invalid leg data received")
+                    st.write("Raw response:")
+                    st.json(leg_data)
 
 else:
     st.info("👈 Click 'FETCH MATCHES' to load matches")
