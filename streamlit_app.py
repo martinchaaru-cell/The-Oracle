@@ -364,15 +364,21 @@ if st.session_state.selected_match:
                         st.write(f"**League:** {entry.get('leagueName', 'N/A')}  |  **Season:** {entry.get('season', 'N/A')}")
                         for scope in ("total", "home", "away"):
                             section = entry.get(scope, {})
-                            if section:
-                                st.write(f"**{scope.capitalize()}:**")
-                                played = section.get("played", "N/A")
-                                wins   = section.get("wins",   "N/A")
-                                draws  = section.get("draws",  "N/A")
-                                loses  = section.get("loses",  "N/A")
-                                gf     = section.get("goalsScored",   section.get("goalsFor", "N/A"))
-                                ga     = section.get("goalsConceded", section.get("goalsAgainst", "N/A"))
-                                st.write(f"P {played}  W {wins}  D {draws}  L {loses}  |  GF {gf}  GA {ga}")
+                            if not section:
+                                continue
+                            # Actual shape: section.games.{played,wins,loses,draws}
+                            #               section.goals.{scored,received}
+                            games  = section.get("games", {})
+                            goals  = section.get("goals", {})
+                            played = games.get("played", "N/A")
+                            wins   = games.get("wins",   "N/A")
+                            draws  = games.get("draws",  "N/A")
+                            loses  = games.get("loses",  "N/A")
+                            gf     = goals.get("scored",   goals.get("for",     "N/A"))
+                            ga     = goals.get("received", goals.get("against", "N/A"))
+                            st.write(f"**{scope.capitalize()}:**  "
+                                     f"P {played}  W {wins}  D {draws}  L {loses}  "
+                                     f"|  GF {gf}  GA {ga}")
                     else:
                         st.info("No matching season entry — see raw response.")
 
